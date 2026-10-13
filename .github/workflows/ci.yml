@@ -28,7 +28,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Generated API types match the vendored OpenAPI contract
+        shell: bash
+        run: |
+          pnpm api:generate
+          if ! git diff --exit-code -- src/api/schema.d.ts; then
+            echo "::error::src/api/schema.d.ts is stale. Run 'pnpm api:generate' and commit it."
+            exit 1
+          fi
       - run: pnpm typecheck
+      - run: pnpm test
       - run: pnpm build
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
@@ -37,4 +46,5 @@ jobs:
         with:
           workspaces: src-tauri
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
