@@ -1,0 +1,8 @@
+# LiveKit's prebuilt libwebrtc (linked through ovrilo-voice) is built with the static CRT (/MT);
+# the desktop binary must match (see ovrilo-voice/.cargo/config.toml).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# ovrilo-voice is a private Git dependency; use the git CLI so its credential helper applies.
+[net]
+git-fetch-with-cli = true

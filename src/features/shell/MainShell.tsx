@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { useSession } from "../../auth/SessionContext";
+import { voice, voiceAvailable, useVoice } from "../voice/voice";
+import { VoicePanel } from "../voice/VoicePanel";
 import { CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
 import { useChannels, useCommunities } from "./queries";
 
@@ -13,6 +15,8 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  const { snapshot: voiceState } = useVoice();
+  const connectedChannelId = voiceState.connection === "disconnected" ? null : voiceState.channelId;
 
   const community =
     communities.data?.find((c) => c.id === selectedCommunityId) ?? communities.data?.[0] ?? null;
@@ -60,6 +64,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               title="Voice"
               channels={channels.data?.filter((c) => c.type === "voice") ?? []}
               selectedId={channel?.id}
+              connectedId={connectedChannelId}
               onSelect={setSelectedChannelId}
             />
             <ChannelGroup
@@ -84,7 +89,14 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             <strong>{user.displayName}</strong>
             <span className="muted">@{user.username}</span>
           </div>
-          <button className="ghost" onClick={() => void session.signOut()}>
+          <button
+            className="ghost"
+            onClick={() => {
+              // The room grant belongs to this account; never stay connected after signing out.
+              if (voiceAvailable) void voice.leave();
+              void session.signOut();
+            }}
+          >
             Sign out
           </button>
         </footer>
@@ -100,13 +112,13 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               </h1>
               {channel.topic && <span className="muted">{channel.topic}</span>}
             </header>
-            <div className="empty-state">
-              <p className="muted">
-                {channel.type === "text"
-                  ? "Text messaging is not available yet."
-                  : "Voice is not available yet. Joining voice channels arrives with the native voice engine."}
-              </p>
-            </div>
+            {channel.type === "voice" ? (
+              <VoicePanel key={channel.id} channel={channel} />
+            ) : (
+              <div className="empty-state">
+                <p className="muted">Text messaging is not available yet.</p>
+              </div>
+            )}
           </>
         ) : (
           <div className="empty-state">
@@ -132,11 +144,13 @@ function ChannelGroup({
   title,
   channels,
   selectedId,
+  connectedId,
   onSelect,
 }: {
   title: string;
   channels: Schemas["ChannelResponse"][];
   selectedId: string | undefined;
+  connectedId?: string | null;
   onSelect: (id: string) => void;
 }) {
   if (channels.length === 0) return null;
@@ -148,6 +162,7 @@ function ChannelGroup({
           <li key={c.id}>
             <button className="channel-row" aria-current={c.id === selectedId} onClick={() => onSelect(c.id)}>
               <span aria-hidden="true">{c.type === "text" ? "#" : "🔊"}</span> {c.name}
+              {c.id === connectedId && <span className="voice-dot connected" title="You are in this channel" />}
             </button>
           </li>
         ))}

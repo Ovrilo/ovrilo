@@ -18,6 +18,13 @@ pub struct CommandError {
 }
 
 impl CommandError {
+    pub fn new(code: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+
     fn storage(error: KeyringError) -> Self {
         Self {
             code: "credentials.storage_unavailable",
