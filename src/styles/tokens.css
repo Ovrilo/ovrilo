@@ -1,0 +1,40 @@
+/* Design tokens — docs/design/DESIGN.md §4 (proposed palette). */
+:root {
+  --bg: #0b1017;
+  --surface-1: #121a25;
+  --surface-2: #1c2938;
+  --surface-hover: #26364a;
+  --primary: #287bff;
+  --cyan: #06b6d4;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text-primary: #eff6ff;
+  --text-secondary: #9aafc3;
+  --border: #293747;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-panel: 14px;
+
+  --rail-width: 60px;
+  --sidebar-width: 240px;
+
+  --transition: 150ms ease;
+
+  --font-ui: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-size-base: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0ms;
+  }
+}
