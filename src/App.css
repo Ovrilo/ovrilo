@@ -123,6 +123,8 @@ button:disabled {
 button.primary {
   border-color: var(--primary);
   background: var(--primary);
+  /* Not inherited: inside tinted containers (the update banner) the text would vanish into the fill. */
+  color: #fff;
   font-weight: 600;
 }
 

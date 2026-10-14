@@ -87,7 +87,7 @@ export function UpdateBanner() {
           </button>
         ) : (
           <button className="primary small-button" onClick={() => void install()}>
-            {confirmLeave ? "Leave & update" : "Restart to update"}
+            {confirmLeave ? "Leave & update" : "Update now"}
           </button>
         ))}
     </section>
