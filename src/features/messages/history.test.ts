@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupRows, type History, type Message, newestId, upsertMessage, visibleMessages } from "./history";
+import { groupRows, type History, type Message, newestId, upsertMessage, visibleMessages, withAuthorProfile } from "./history";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 14, 12, minute)).toISOString();
 
@@ -9,7 +9,7 @@ function message(id: number, overrides: Partial<Message> = {}): Message {
     id,
     channelId: "c",
     clientMessageId: `client-${id}`,
-    author: { id: "ada", displayName: "Ada" },
+    author: { id: "ada", displayName: "Ada", avatarAssetId: null },
     content: `message ${id}`,
     replyToMessageId: null,
     createdAt: at(id),
@@ -64,10 +64,30 @@ describe("groupRows", () => {
     const rows = groupRows([
       message(1),
       message(2),
-      message(3, { author: { id: "bob", displayName: "Bob" } }),
-      message(20, { author: { id: "bob", displayName: "Bob" } }),
-      message(21, { author: { id: "bob", displayName: "Bob" }, replyToMessageId: 1 }),
+      message(3, { author: { id: "bob", displayName: "Bob", avatarAssetId: null } }),
+      message(20, { author: { id: "bob", displayName: "Bob", avatarAssetId: null } }),
+      message(21, { author: { id: "bob", displayName: "Bob", avatarAssetId: null }, replyToMessageId: 1 }),
     ]);
     expect(rows.map((r) => r.continued)).toEqual([false, true, false, false, false]);
+  });
+});
+
+describe("withAuthorProfile", () => {
+  it("updates the author on loaded messages and leaves others alone", () => {
+    const data = history({ ids: [1, 2], hasMore: false });
+    data.pages[0]!.messages[1] = message(2, { author: { id: "bob", displayName: "Bob", avatarAssetId: null } });
+
+    const next = withAuthorProfile(data, "ada", "Ada L.", "asset-1")!;
+
+    expect(next.pages[0]!.messages.map((m) => m.author)).toEqual([
+      { id: "ada", displayName: "Ada L.", avatarAssetId: "asset-1" },
+      { id: "bob", displayName: "Bob", avatarAssetId: null },
+    ]);
+  });
+
+  it("returns the same history when the user has no loaded messages", () => {
+    const data = history({ ids: [1], hasMore: false });
+
+    expect(withAuthorProfile(data, "nobody", "X", null)).toBe(data);
   });
 });

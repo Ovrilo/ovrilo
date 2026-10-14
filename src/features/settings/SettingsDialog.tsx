@@ -2,9 +2,11 @@ import { Keyboard, LogOut, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { useSession } from "../../auth/SessionContext";
+import { useApi, useSession } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
+import { PicturePicker } from "../../components/PicturePicker";
 import { Avatar } from "../../components/ui";
+import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
@@ -152,15 +154,36 @@ function KeyCapture({ onKey, onCancel }: { onKey: (key: PushToTalkKey) => void; 
 
 function AccountSettings({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const { session } = useSession();
+  const api = useApi();
+
+  const setAvatar = async (file: File) => {
+    const assetId = await uploadImage(api, file, "avatar");
+    const { data, error } = await api.PUT("/users/me/avatar", { body: { assetId } });
+    if (!data) throw error;
+    session.updateUser(data);
+  };
+  const removeAvatar = async () => {
+    const { data, error } = await api.DELETE("/users/me/avatar");
+    if (!data) throw error;
+    session.updateUser(data);
+  };
+
   return (
     <div className="settings-section">
       <div className="account-card">
-        <Avatar name={user.displayName} size="lg" />
+        <Avatar name={user.displayName} assetId={user.avatarAssetId} size="lg" animate="always" />
         <div>
           <strong>{user.displayName}</strong>
           <span className="muted">@{user.username}</span>
         </div>
       </div>
+      <PicturePicker
+        preview={null}
+        hasPicture={user.avatarAssetId !== null}
+        onUpload={setAvatar}
+        onRemove={removeAvatar}
+        hint="PNG, JPEG, WebP or GIF. Animated GIFs up to 8 MB play when someone points at your picture."
+      />
       <button
         className="danger with-icon"
         onClick={() => {

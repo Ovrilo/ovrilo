@@ -38,6 +38,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets the profile picture to a completed avatar upload. The previous picture is deleted. */
+        put: operations["SetAvatar"];
+        post?: never;
+        /** Removes the profile picture; initials are shown instead. */
+        delete: operations["RemoveAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitations/accept": {
         parameters: {
             query?: never;
@@ -278,6 +296,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/communities/{communityId}/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets the community icon to a completed upload made for it. Needs ManageCommunity. */
+        put: operations["SetCommunityIcon"];
+        post?: never;
+        /** Removes the community icon. Needs ManageCommunity. */
+        delete: operations["RemoveCommunityIcon"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/communities/{communityId}/leave": {
         parameters: {
             query?: never;
@@ -384,6 +420,57 @@ export interface paths {
         patch: operations["EditMessage"];
         trace?: never;
     };
+    "/media/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts an image upload and returns a short-lived URL to PUT the file to. Call complete afterwards. */
+        post: operations["CreateMediaUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/uploads/{assetId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verifies an uploaded image (size, real format, dimensions) and makes it usable. Safe to retry. */
+        post: operations["CompleteMediaUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/download-urls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Short-lived read URLs for up to 100 images the caller may view (avatars, icons of their communities). */
+        post: operations["CreateMediaDownloadUrls"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -435,6 +522,8 @@ export interface components {
             myRole: components["schemas"]["CommunityRole"];
             /** Format: date-time */
             createdAt: string;
+            /** Format: uuid */
+            iconAssetId: null | string;
         };
         /** @enum {unknown} */
         CommunityRole: "member" | "owner";
@@ -453,6 +542,15 @@ export interface components {
             /** Format: int32 */
             expiresInHours: null | number;
         };
+        CreateUploadRequest: {
+            purpose: components["schemas"]["MediaPurpose"];
+            contentType: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            filename: null | string;
+            /** Format: uuid */
+            communityId: null | string;
+        };
         CurrentUserResponse: {
             /** Format: uuid */
             id: string;
@@ -462,6 +560,23 @@ export interface components {
             emailVerified: boolean;
             /** Format: date-time */
             createdAt: string;
+            /** Format: uuid */
+            avatarAssetId: null | string;
+        };
+        DownloadUrl: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: uri */
+            url: string;
+            contentType: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DownloadUrlsRequest: {
+            assetIds: string[];
+        };
+        DownloadUrlsResponse: {
+            urls: components["schemas"]["DownloadUrl"][];
         };
         EditMessageRequest: {
             content: string;
@@ -497,6 +612,20 @@ export interface components {
             /** Format: int64 */
             lastReadMessageId: number;
         };
+        MediaAssetResponse: {
+            /** Format: uuid */
+            id: string;
+            purpose: components["schemas"]["MediaPurpose"];
+            contentType: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+        };
+        /** @enum {unknown} */
+        MediaPurpose: "avatar" | "communityIcon";
         MemberResponse: {
             /** Format: uuid */
             userId: string;
@@ -506,11 +635,15 @@ export interface components {
             role: components["schemas"]["CommunityRole"];
             /** Format: date-time */
             joinedAt: string;
+            /** Format: uuid */
+            avatarAssetId: null | string;
         };
         MessageAuthor: {
             /** Format: uuid */
             id: string;
             displayName: null | string;
+            /** Format: uuid */
+            avatarAssetId: null | string;
         };
         MessagePageResponse: {
             messages: components["schemas"]["MessageResponse"][];
@@ -565,11 +698,30 @@ export interface components {
             /** Format: int64 */
             replyToMessageId: null | number;
         };
+        SetAvatarRequest: {
+            /** Format: uuid */
+            assetId: string;
+        };
+        SetCommunityIconRequest: {
+            /** Format: uuid */
+            assetId: string;
+        };
         UpdateChannelRequest: {
             name: null | string;
             topic: null | string;
             /** Format: int32 */
             position: null | number;
+        };
+        UploadResponse: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: uri */
+            uploadUrl: string;
+            contentType: string;
+            /** Format: int64 */
+            maxBytes: number;
+            /** Format: date-time */
+            expiresAt: string;
         };
         VersionResponse: {
             version: string;
@@ -591,6 +743,8 @@ export interface components {
             userId: string;
             displayName: string;
             muted: boolean;
+            /** Format: uuid */
+            avatarAssetId: null | string;
         };
     };
     responses: never;
@@ -622,6 +776,73 @@ export interface operations {
         };
     };
     GetCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SetAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetAvatarRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RemoveAvatar: {
         parameters: {
             query?: never;
             header?: never;
@@ -1342,6 +1563,113 @@ export interface operations {
             };
         };
     };
+    SetCommunityIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                communityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCommunityIconRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveCommunityIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                communityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     LeaveCommunity: {
         parameters: {
             query?: never;
@@ -1903,6 +2231,169 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    CreateMediaUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CompleteMediaUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateMediaDownloadUrls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadUrlsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadUrlsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

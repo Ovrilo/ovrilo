@@ -2,6 +2,13 @@
 
 User-facing changes to the Ovrilo desktop app. Each release's notes are taken from its section here by the release workflow, so write for the people who use the app, not for developers.
 
+## [Unreleased]
+
+### New
+- Profile pictures. Upload a PNG, JPEG, WebP or GIF in Settings → Account; everyone in your communities sees it next to your name, in chat and in voice.
+- Animated GIF avatars (up to 8 MB). They play when you point at them, so long member lists stay calm.
+- Community icons. Owners can pick one from the button next to the community name.
+
 ## [0.3.0] - 2026-10-14
 
 Text chat arrives. Your crew can now talk in text channels, not just voice.

@@ -258,13 +258,13 @@ function MessageItem({
   const name = message.author.displayName ?? "Deleted user";
 
   return (
-    <li className={`message${continued ? " continued" : ""}`}>
+    <li className={`message avatar-hover-scope${continued ? " continued" : ""}`}>
       {continued ? (
         <time className="message-gutter-time" dateTime={message.createdAt} title={formatTime(message.createdAt)}>
           {timeFormat.format(new Date(message.createdAt))}
         </time>
       ) : (
-        <Avatar name={name} size="md" />
+        <Avatar name={name} assetId={message.author.avatarAssetId} size="md" />
       )}
       <div className="message-body">
         {!continued && (
@@ -337,7 +337,7 @@ function PendingItem({
 }) {
   return (
     <li className={`message pending ${pending.status}`}>
-      <Avatar name={user.displayName} size="md" />
+      <Avatar name={user.displayName} assetId={user.avatarAssetId} size="md" />
       <div className="message-body">
         <div className="message-meta">
           <strong>{user.displayName}</strong>
