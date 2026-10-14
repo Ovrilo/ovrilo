@@ -1,0 +1,141 @@
+name: Release
+
+# Builds a signed Windows installer for a `v*` tag and attaches it, its updater signature and the
+# updater manifest (latest.json) to a DRAFT release in the public Ovrilo/ovrilo-releases repository.
+# Publishing the draft is a manual step; the in-app updater only sees published releases.
+#
+# Requires (repository settings of Ovrilo/ovrilo):
+#   secrets.TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD  updater signing key
+#   secrets.RELEASES_TOKEN       fine-grained token: Contents read/write on Ovrilo/ovrilo-releases only
+#   secrets.OVRILO_VOICE_DEPLOY_KEY  read-only access to the private voice engine (as in rust.yml)
+#   vars.OVRILO_API_URL          https API origin compiled into the release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASES_REPO: Ovrilo/ovrilo-releases
+
+jobs:
+  release:
+    name: Build and draft release (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Tag matches the app version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          node -e '
+            const fs = require("fs");
+            const tag = process.argv[1];
+            const versions = {
+              "package.json": JSON.parse(fs.readFileSync("package.json", "utf8")).version,
+              "tauri.conf.json": JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json", "utf8")).version,
+              "Cargo.toml": fs.readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version = "([^"]+)"/m)[1],
+            };
+            const wrong = Object.entries(versions).filter(([, v]) => v !== tag);
+            if (wrong.length) { console.error(`::error::Tag v${tag} does not match`, versions); process.exit(1); }
+          ' "$tag"
+          if grep -q '^\[patch\.' src-tauri/Cargo.toml; then
+            echo "::error::src-tauri/Cargo.toml contains a [patch] section (local development only)."
+            exit 1
+          fi
+          test -n "${{ vars.OVRILO_API_URL }}" || { echo "::error::vars.OVRILO_API_URL is not set"; exit 1; }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generated API types match the vendored OpenAPI contract
+        run: |
+          pnpm api:generate
+          git diff --exit-code -- src/api/schema.d.ts
+      - run: pnpm typecheck
+      - run: pnpm test
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          shared-key: release
+      - name: Read access to the private ovrilo-voice dependency
+        env:
+          OVRILO_VOICE_DEPLOY_KEY: ${{ secrets.OVRILO_VOICE_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$OVRILO_VOICE_DEPLOY_KEY" > ~/.ssh/ovrilo_voice
+          chmod 600 ~/.ssh/ovrilo_voice
+          # GitHub's published SSH host key (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          git config --global url."git@github.com:Ovrilo/ovrilo-voice".insteadOf "https://github.com/Ovrilo/ovrilo-voice"
+          git config --global core.sshCommand "ssh -i ~/.ssh/ovrilo_voice -o IdentitiesOnly=yes"
+      - run: cargo fmt --check
+        working-directory: src-tauri
+      - run: cargo clippy --all-targets --locked -- -D warnings
+        working-directory: src-tauri
+      - run: cargo test --locked
+        working-directory: src-tauri
+      - name: Build signed installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set"; exit 1; }
+          pnpm release:build "${{ vars.OVRILO_API_URL }}"
+          # The release must be built from the committed lockfile.
+          git diff --exit-code -- src-tauri/Cargo.lock pnpm-lock.yaml
+      - name: Assemble release assets
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          name="Ovrilo_${version}_x64-setup.exe"
+          bundle="src-tauri/target/release/bundle/nsis"
+          mkdir -p dist-release
+          cp "$bundle/$name" "$bundle/$name.sig" dist-release/
+          (cd dist-release && sha256sum "$name" > SHA256SUMS.txt)
+          # Release notes are the curated CHANGELOG.md section for this version (required).
+          node scripts/release-notes.mjs "$version" > dist-release/NOTES.md
+          VERSION="$version" NAME="$name" node -e '
+            const fs = require("fs");
+            const { VERSION, NAME, RELEASES_REPO } = process.env;
+            const manifest = {
+              version: VERSION,
+              notes: fs.readFileSync("dist-release/NOTES.md", "utf8"),
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "windows-x86_64": {
+                  // The signature is the .sig file content, not a path.
+                  signature: fs.readFileSync(`dist-release/${NAME}.sig`, "utf8").trim(),
+                  url: `https://github.com/${RELEASES_REPO}/releases/download/v${VERSION}/${NAME}`,
+                },
+              },
+            };
+            fs.writeFileSync("dist-release/latest.json", JSON.stringify(manifest, null, 2));
+          '
+          ls -la dist-release
+      - name: Create draft release in the public releases repository
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          prerelease=""
+          case "$version" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "v${version}" dist-release/Ovrilo_* dist-release/SHA256SUMS.txt dist-release/latest.json \
+            --repo "$RELEASES_REPO" --draft $prerelease \
+            --title "Ovrilo ${version}" --notes-file dist-release/NOTES.md

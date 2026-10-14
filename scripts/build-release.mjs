@@ -39,7 +39,14 @@ if (csp === devCsp && api.origin !== "http://localhost:5158") {
 // Passed as a file: JSON on the Windows command line does not survive shell quoting.
 const dir = mkdtempSync(join(tmpdir(), "ovrilo-release-"));
 const overrides = join(dir, "tauri.release.conf.json");
-writeFileSync(overrides, JSON.stringify({ app: { security: { csp } } }));
+// Updater artifacts (.sig) need the private signing key, available only in the release workflow
+// (TAURI_SIGNING_PRIVATE_KEY). Local builds produce an unsigned-for-update installer instead.
+const signUpdates = Boolean(process.env.TAURI_SIGNING_PRIVATE_KEY);
+if (!signUpdates) console.warn("TAURI_SIGNING_PRIVATE_KEY not set: building without updater signature.");
+writeFileSync(
+  overrides,
+  JSON.stringify({ app: { security: { csp } }, bundle: { createUpdaterArtifacts: signUpdates } }),
+);
 
 console.log(`Building Ovrilo ${tauriConfig.version} for API ${api.origin}`);
 const result = spawnSync("pnpm", ["tauri", "build", "--bundles", "nsis", "--config", overrides], {

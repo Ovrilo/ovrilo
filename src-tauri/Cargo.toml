@@ -1,6 +1,6 @@
 [package]
 name = "ovrilo"
-version = "0.1.0"
+version = "0.2.0"
 description = "Ovrilo desktop client"
 authors = ["Ovrilo"]
 edition = "2024"
@@ -23,6 +23,8 @@ keyring = { version = "3.6.3", features = ["windows-native"] }
 ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
 ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
 ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
+tauri-plugin-updater = "=2.13.1"
+tauri-plugin-process = "=2.4.0"
 
 # Real-time audio (ovrilo-voice, LiveKit, cpal) stutters when unoptimized; optimize all
 # dependencies in dev builds while the app crate itself stays fast to rebuild.

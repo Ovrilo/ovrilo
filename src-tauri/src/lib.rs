@@ -20,6 +20,9 @@ fn app_version() -> &'static str {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Signed updates from Ovrilo/ovrilo-releases (tauri.conf.json); restart after install.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             app.manage(voice::VoiceHost::start(app.handle().clone()));
             tray::install(app)?;

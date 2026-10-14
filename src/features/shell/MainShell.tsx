@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Schemas } from "../../api/client";
 import { Avatar, IconButton, initials } from "../../components/ui";
 import { SettingsDialog } from "../settings/SettingsDialog";
+import { UpdateBanner } from "../update/UpdateBanner";
 import { useJoinVoice } from "../voice/useJoinVoice";
 import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/ParticipantMenu";
 import { useVoice, voiceAvailable } from "../voice/voice";
@@ -164,6 +165,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         )}
 
         <div className="sidebar-footer">
+          <UpdateBanner />
           <VoiceDock
             channelName={connectedName}
             onOpen={() => {
