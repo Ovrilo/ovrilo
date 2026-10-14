@@ -1,9 +1,11 @@
-import { HeadphoneOff, Hash, LogIn, MicOff, Plus, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { HeadphoneOff, Hash, LogIn, MicOff, Plus, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { Avatar, IconButton, initials } from "../../components/ui";
+import { TextChannel } from "../messages/TextChannel";
+import { type ChannelUnread, isUnread, unreadLabel, useCommunitiesWithUnread, useUnread, useUnreadSync } from "../messages/unread";
 import { SettingsDialog } from "../settings/SettingsDialog";
 import { UpdateBanner } from "../update/UpdateBanner";
 import { useJoinVoice } from "../voice/useJoinVoice";
@@ -11,6 +13,7 @@ import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/Participan
 import { useVoice, voiceAvailable } from "../voice/voice";
 import { VoiceDock } from "../voice/VoiceDock";
 import { VoiceRoom } from "../voice/VoiceRoom";
+import { MembersPanel } from "./MembersPanel";
 import { CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
 import { useChannels, useCommunities, useVoiceStates } from "./queries";
 import logo from "../../assets/logo.webp";
@@ -25,6 +28,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
+  const [showMembers, setShowMembers] = useState(readShowMembers);
   const { snapshot } = useVoice();
   const join = useJoinVoice();
 
@@ -69,6 +73,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
 
   const voiceChannels = channels.data?.filter((c) => c.type === "voice") ?? [];
   const textChannels = channels.data?.filter((c) => c.type === "text") ?? [];
+  const unread = useUnread(community?.id ?? null);
+  useUnreadSync(community?.id ?? null, textChannels.map((c) => c.id), user.id);
+  const communitiesWithUnread = useCommunitiesWithUnread(communities.data?.map((c) => c.id) ?? []);
 
   return (
     <div className="app-shell">
@@ -82,6 +89,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             title={c.name}
             onClick={() => selectCommunity(c.id)}
           >
+            {communitiesWithUnread.has(c.id) && c.id !== community?.id && (
+              <span className="space-unread" aria-label="Unread messages" />
+            )}
             {initials(c.name)}
             {c.id === connectedChannel?.communityId && connectedChannelId && (
               <span className="space-voice-dot" aria-hidden="true" />
@@ -145,6 +155,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               <ChannelGroup
                 title="Text"
                 channels={textChannels}
+                unread={(c) => unread.data?.find((u) => u.channelId === c.id)}
                 selectedId={channel?.id}
                 canCreate={isOwner}
                 onCreate={() => setDialog("createChannel")}
@@ -190,6 +201,19 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               )}
               <h1>{channel.name}</h1>
               {channel.topic && <span className="muted channel-topic">{channel.topic}</span>}
+              {channel.type === "text" && (
+                <IconButton
+                  icon={Users}
+                  label={showMembers ? "Hide member list" : "Show member list"}
+                  tone={showMembers ? "active" : "default"}
+                  className="channel-header-action"
+                  aria-pressed={showMembers}
+                  onClick={() => {
+                    setShowMembers(!showMembers);
+                    writeShowMembers(!showMembers);
+                  }}
+                />
+              )}
             </header>
             {channel.type === "voice" ? (
               <VoiceRoom
@@ -200,9 +224,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                 join={{ mutate: () => joinVoice(channel), isPending: join.isPending, error: join.error }}
               />
             ) : (
-              <div className="empty-state">
-                <Hash size={32} aria-hidden="true" />
-                <p className="muted">Text messaging arrives in a later update.</p>
+              <div className="channel-body">
+                <TextChannel key={channel.id} channel={channel} user={user} canModerate={isOwner} />
+                {showMembers && <MembersPanel communityId={channel.communityId} selfId={user.id} />}
               </div>
             )}
           </>
@@ -284,6 +308,7 @@ function ChannelGroup({
   onCreate,
   onSelect,
   renderExtra,
+  unread,
 }: {
   title: string;
   channels: Channel[];
@@ -292,6 +317,7 @@ function ChannelGroup({
   onCreate: () => void;
   onSelect: (channel: Channel) => void;
   renderExtra?: (channel: Channel) => ReactNode;
+  unread?: (channel: Channel) => ChannelUnread | undefined;
 }) {
   if (channels.length === 0 && !canCreate) return null;
   return (
@@ -301,16 +327,50 @@ function ChannelGroup({
         {canCreate && <IconButton icon={Plus} label={`Create ${title.toLowerCase()} channel`} className="small" onClick={onCreate} />}
       </header>
       <ul>
-        {channels.map((c) => (
-          <li key={c.id}>
-            <button className="channel-row" aria-current={c.id === selectedId} onClick={() => onSelect(c)}>
-              {c.type === "text" ? <Hash size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
-              <span>{c.name}</span>
-            </button>
-            {renderExtra?.(c)}
-          </li>
-        ))}
+        {channels.map((c) => {
+          // The open channel is being read: no badge there.
+          const entry = c.id === selectedId ? undefined : unread?.(c);
+          const hasUnread = isUnread(entry);
+          return (
+            <li key={c.id}>
+              <button
+                className={`channel-row${hasUnread ? " unread" : ""}`}
+                aria-current={c.id === selectedId}
+                aria-label={hasUnread ? `${c.name}, ${unreadLabel(entry!.unreadCount)} unread` : undefined}
+                onClick={() => onSelect(c)}
+              >
+                {c.type === "text" ? <Hash size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
+                <span>{c.name}</span>
+                {hasUnread && (
+                  <span className="unread-badge" aria-hidden="true">
+                    {unreadLabel(entry!.unreadCount)}
+                  </span>
+                )}
+              </button>
+              {renderExtra?.(c)}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
+}
+
+const SHOW_MEMBERS_KEY = "ovrilo.showMembers";
+
+/** Member list visibility is a per-device preference; storage may be unavailable. */
+function readShowMembers(): boolean {
+  try {
+    return localStorage.getItem(SHOW_MEMBERS_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeShowMembers(value: boolean) {
+  try {
+    localStorage.setItem(SHOW_MEMBERS_KEY, String(value));
+  } catch {
+    // Not remembered; the default applies next time.
+  }
 }

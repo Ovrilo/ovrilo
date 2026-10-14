@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Schemas } from "../api/client";
-import { type CredentialStore, SessionManager } from "./session";
+import { type CredentialStore, secondsUntilExpiry, SessionManager } from "./session";
 
 const BASE = "http://api.test";
 
@@ -146,5 +146,19 @@ describe("SessionManager", () => {
     expect(request.headers.get("Authorization")).toBe("Bearer access-1");
     expect(store.value).toBeNull();
     expect(session.getState().status).toBe("signedOut");
+  });
+});
+
+describe("secondsUntilExpiry", () => {
+  const jwt = (payload: object) =>
+    ["header", btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""), "sig"].join(".");
+
+  it("reads exp relative to now", () => {
+    expect(secondsUntilExpiry(jwt({ exp: 1000 }), 400_000)).toBe(600);
+  });
+
+  it("treats unreadable tokens as expired", () => {
+    expect(secondsUntilExpiry("not-a-jwt")).toBe(0);
+    expect(secondsUntilExpiry(jwt({ sub: "x" }))).toBe(0);
   });
 });

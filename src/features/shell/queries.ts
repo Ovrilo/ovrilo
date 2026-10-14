@@ -6,6 +6,7 @@ export const queryKeys = {
   communities: ["communities"] as const,
   channels: (communityId: string) => ["communities", communityId, "channels"] as const,
   voiceStates: (communityId: string) => ["communities", communityId, "voice-states"] as const,
+  members: (communityId: string) => ["communities", communityId, "members"] as const,
 };
 
 /** Refresh interval for voice channel occupancy until realtime push (SignalR, Phase 04) replaces it. */
@@ -52,6 +53,21 @@ export function useChannels(communityId: string | null) {
     enabled: communityId !== null,
     queryFn: async () => {
       const { data, error } = await api.GET("/communities/{communityId}/channels", {
+        params: { path: { communityId: communityId! } },
+      });
+      if (!data) throw error;
+      return data;
+    },
+  });
+}
+
+export function useMembers(communityId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.members(communityId ?? ""),
+    enabled: communityId !== null,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/communities/{communityId}/members", {
         params: { path: { communityId: communityId! } },
       });
       if (!data) throw error;

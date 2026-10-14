@@ -87,6 +87,15 @@ export class SessionManager {
     return response;
   };
 
+  /**
+   * An access token valid for at least another minute, refreshing first if needed (for connections
+   * that cannot retry a 401 the way `fetch` does, such as the realtime hub). Null when signed out.
+   */
+  getAccessToken = async (): Promise<string | null> => {
+    if (this.accessToken && secondsUntilExpiry(this.accessToken) > 60) return this.accessToken;
+    return (await this.refresh()) ? this.accessToken : null;
+  };
+
   /** Rotates the refresh token. Concurrent callers share one request. Returns false when signed out. */
   refresh(): Promise<boolean> {
     this.refreshInFlight ??= this.doRefresh().finally(() => {
@@ -141,5 +150,17 @@ export class SessionManager {
   private setState(state: SessionState): void {
     this.state = state;
     this.listeners.forEach((listener) => listener());
+  }
+}
+
+/** Seconds until a JWT's `exp`; 0 when it cannot be read (treated as expired). */
+export function secondsUntilExpiry(jwt: string, nowMs = Date.now()): number {
+  try {
+    const payload = jwt.split(".")[1] ?? "";
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp - nowMs / 1000 : 0;
+  } catch {
+    return 0;
   }
 }
