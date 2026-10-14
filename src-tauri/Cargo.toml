@@ -20,9 +20,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3.6.3", features = ["windows-native"] }
 # Pinned Git revision (ADR-0001). Private repo: fetched with the git CLI (see .cargo/config.toml).
-ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "aae83303941010dd54584301b4a2a1a98a86f933" }
-ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "aae83303941010dd54584301b4a2a1a98a86f933" }
-ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "aae83303941010dd54584301b4a2a1a98a86f933" }
+ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
+ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
+ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
 
 # Real-time audio (ovrilo-voice, LiveKit, cpal) stutters when unoptimized; optimize all
 # dependencies in dev builds while the app crate itself stays fast to rebuild.
@@ -40,9 +40,3 @@ strip = true
 [target.'cfg(windows)'.dependencies]
 # GetAsyncKeyState for the push-to-talk key (already in the dependency tree via Tauri).
 windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse"] }
-
-# LOCAL DEVELOPMENT ONLY - replace with a pinned rev before committing.
-[patch."https://github.com/Ovrilo/ovrilo-voice"]
-ovrilo-voice = { path = "../../ovrilo-voice/crates/ovrilo-voice" }
-ovrilo-voice-cpal = { path = "../../ovrilo-voice/crates/ovrilo-voice-cpal" }
-ovrilo-voice-livekit = { path = "../../ovrilo-voice/crates/ovrilo-voice-livekit" }
