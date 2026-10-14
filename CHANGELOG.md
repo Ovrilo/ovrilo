@@ -2,6 +2,23 @@
 
 User-facing changes to the Ovrilo desktop app. Each release's notes are taken from its section here by the release workflow, so write for the people who use the app, not for developers.
 
+## [0.3.0] - 2026-10-14
+
+Text chat arrives. Your crew can now talk in text channels, not just voice.
+
+### New
+- Text channels: messages appear for everyone instantly, and you can edit or delete your own.
+- Scroll up to read older messages. When new ones arrive while you are reading, a button takes you back down.
+- A member list next to the chat shows who is online.
+- Channels with unread messages stand out and show how many are waiting. A red "New" line marks where you stopped reading.
+- Reading a channel on one computer clears its unread count on your other ones.
+- Sending too many messages too fast shows a short countdown instead of failing. Your text stays in the box.
+- If the connection drops, Ovrilo catches up on the messages you missed when it reconnects.
+
+### Known issues
+- Opening a channel you have never read counts its whole history as unread.
+- Opening a channel shows the newest messages, not the first unread one.
+
 ## [0.2.0] - 2026-10-14
 
 The first build that updates itself. Install it once by hand; later versions arrive in the app.
