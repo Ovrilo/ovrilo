@@ -2,12 +2,22 @@
 
 User-facing changes to the Ovrilo desktop app. Each release's notes are taken from its section here by the release workflow, so write for the people who use the app, not for developers.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-14
+
+Put a face to the name: profile pictures, animated avatars and community icons.
 
 ### New
 - Profile pictures. Upload a PNG, JPEG, WebP or GIF in Settings → Account; everyone in your communities sees it next to your name, in chat and in voice.
 - Animated GIF avatars (up to 8 MB). They play when you point at them, so long member lists stay calm.
 - Community icons. Owners can pick one from the button next to the community name.
+
+### Fixed
+- Reading a channel on one computer now also clears its unread count on your other ones.
+
+### Known issues
+- Pictures appear once your server has image storage set up. Until then, uploading says pictures are not available yet.
+- Opening a channel you have never read counts its whole history as unread.
+- Opening a channel shows the newest messages, not the first unread one.
 
 ## [0.3.0] - 2026-10-14
 
