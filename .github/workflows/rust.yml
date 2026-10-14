@@ -1,0 +1,69 @@
+name: Rust
+
+# Windows build of the native host (Tauri + ovrilo-voice/LiveKit). Heavy, so it only runs when
+# the host or this workflow changes.
+
+on:
+  pull_request:
+    paths: ["src-tauri/**", ".github/workflows/rust.yml"]
+  push:
+    branches: [main]
+    paths: ["src-tauri/**", ".github/workflows/rust.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Native host (Windows)
+    runs-on: windows-latest
+    # Cold builds (empty cache) compile Tauri and LiveKit/WebRTC from scratch.
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Local dev builds optimize dependencies for glitch-free audio (Cargo.toml); CI plays no
+      # audio, so skip that to keep builds short.
+      CARGO_DEV_DEPS_UNOPTIMIZED: --config profile.dev.package."*".opt-level=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      # tauri::generate_context! embeds the built frontend (dist/).
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+      - name: Read access to the private ovrilo-voice dependency
+        env:
+          OVRILO_VOICE_DEPLOY_KEY: ${{ secrets.OVRILO_VOICE_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$OVRILO_VOICE_DEPLOY_KEY" > ~/.ssh/ovrilo_voice
+          chmod 600 ~/.ssh/ovrilo_voice
+          # GitHub's published SSH host key (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          git config --global url."git@github.com:Ovrilo/ovrilo-voice".insteadOf "https://github.com/Ovrilo/ovrilo-voice"
+          git config --global core.sshCommand "ssh -i ~/.ssh/ovrilo_voice -o IdentitiesOnly=yes"
+      # Run inside src-tauri so .cargo/config.toml (static CRT, git CLI fetch) applies.
+      - run: cargo fmt --check
+        working-directory: src-tauri
+      - run: cargo clippy $CARGO_DEV_DEPS_UNOPTIMIZED --all-targets --locked -- -D warnings
+        working-directory: src-tauri
+      - run: cargo test $CARGO_DEV_DEPS_UNOPTIMIZED --locked
+        working-directory: src-tauri

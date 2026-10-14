@@ -1,5 +1,8 @@
 name: CI
 
+# Fast frontend checks on every change. The Windows Rust/Tauri build lives in rust.yml and only
+# runs when the native host changes.
+
 on:
   pull_request:
   push:
@@ -14,10 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build and check (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 30
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,7 +32,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generated API types match the vendored OpenAPI contract
-        shell: bash
         run: |
           pnpm api:generate
           if ! git diff --exit-code -- src/api/schema.d.ts; then
@@ -39,28 +41,3 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-      - name: Read access to the private ovrilo-voice dependency
-        shell: bash
-        env:
-          OVRILO_VOICE_DEPLOY_KEY: ${{ secrets.OVRILO_VOICE_DEPLOY_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$OVRILO_VOICE_DEPLOY_KEY" > ~/.ssh/ovrilo_voice
-          chmod 600 ~/.ssh/ovrilo_voice
-          # GitHub's published SSH host key (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
-          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
-          git config --global url."git@github.com:Ovrilo/ovrilo-voice".insteadOf "https://github.com/Ovrilo/ovrilo-voice"
-          git config --global core.sshCommand "ssh -i ~/.ssh/ovrilo_voice -o IdentitiesOnly=yes"
-      # Run inside src-tauri so .cargo/config.toml (static CRT, git CLI fetch) applies.
-      - run: cargo fmt --check
-        working-directory: src-tauri
-      - run: cargo clippy --all-targets --locked -- -D warnings
-        working-directory: src-tauri
-      - run: cargo test --locked
-        working-directory: src-tauri
