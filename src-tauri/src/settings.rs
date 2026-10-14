@@ -2,6 +2,7 @@
 //!
 //! Stored as JSON in the app config directory. Not secret; never holds tokens (ADR-0011).
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
@@ -17,7 +18,14 @@ pub struct DesktopSettings {
     pub output_device_id: Option<String>,
     pub push_to_talk: bool,
     pub push_to_talk_key: Option<PushToTalkKey>,
+    /// Playback volume per user ID (percent); 100 is not stored.
+    pub participant_volumes: BTreeMap<String, u16>,
+    /// Users muted for this client only (their volume is kept for unmuting).
+    pub muted_participants: BTreeSet<String>,
 }
+
+/// Upper bound on remembered per-user volumes, so the file cannot grow without limit.
+pub const MAX_PARTICIPANT_VOLUMES: usize = 500;
 
 /// A key or mouse button as a Windows virtual-key code plus a display label.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,6 +108,18 @@ fn sanitize(mut settings: DesktopSettings) -> DesktopSettings {
     }
     if settings.push_to_talk_key.is_none() {
         settings.push_to_talk = false;
+    }
+    settings.participant_volumes.retain(|id, percent| {
+        !id.is_empty() && id.len() <= 64 && *percent <= 200 && *percent != 100
+    });
+    while settings.participant_volumes.len() > MAX_PARTICIPANT_VOLUMES {
+        settings.participant_volumes.pop_last();
+    }
+    settings
+        .muted_participants
+        .retain(|id| !id.is_empty() && id.len() <= 64);
+    while settings.muted_participants.len() > MAX_PARTICIPANT_VOLUMES {
+        settings.muted_participants.pop_last();
     }
     settings
 }

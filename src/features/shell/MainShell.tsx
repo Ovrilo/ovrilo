@@ -1,15 +1,17 @@
-import { Hash, LogIn, Plus, UserPlus, Volume2 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { HeadphoneOff, Hash, LogIn, MicOff, Plus, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { Avatar, IconButton, initials } from "../../components/ui";
 import { SettingsDialog } from "../settings/SettingsDialog";
 import { useJoinVoice } from "../voice/useJoinVoice";
+import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/ParticipantMenu";
 import { useVoice, voiceAvailable } from "../voice/voice";
 import { VoiceDock } from "../voice/VoiceDock";
 import { VoiceRoom } from "../voice/VoiceRoom";
 import { CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
-import { useChannels, useCommunities } from "./queries";
+import { useChannels, useCommunities, useVoiceStates } from "./queries";
 import logo from "../../assets/logo.webp";
 import { UserBar } from "./UserBar";
 
@@ -21,17 +23,25 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
   const { snapshot } = useVoice();
   const join = useJoinVoice();
 
   const community =
     communities.data?.find((c) => c.id === selectedCommunityId) ?? communities.data?.[0] ?? null;
   const channels = useChannels(community?.id ?? null);
+  const voiceStates = useVoiceStates(community?.id ?? null);
+  const queryClient = useQueryClient();
   const channel = channels.data?.find((c) => c.id === selectedChannelId) ?? null;
   const isOwner = community?.myRole === "owner";
 
   // The room the engine is in; its channel may belong to another community than the one shown.
   const connectedChannelId = snapshot.connection === "disconnected" ? null : snapshot.channelId;
+
+  // Our own join/leave changes occupancy: refresh right away instead of waiting for the next poll.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: ["communities"], predicate: (q) => q.queryKey[2] === "voice-states" });
+  }, [connectedChannelId, snapshot.connection, queryClient]);
   const [connectedChannel, setConnectedChannel] = useState<{ id: string; name: string; communityId: string } | null>(
     null,
   );
@@ -98,16 +108,33 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                 onCreate={() => setDialog("createChannel")}
                 onSelect={openChannel}
                 renderExtra={(c) =>
-                  c.id === connectedChannelId ? (
+                  c.id !== connectedChannelId ? (
+                    <ServerMembers
+                      participants={voiceStates.data?.find((s) => s.channelId === c.id)?.participants ?? []}
+                      channelName={c.name}
+                    />
+                  ) : c.id === connectedChannelId ? (
                     <ul className="channel-members" aria-label={`In ${c.name}`}>
                       <li>
                         <Avatar name={user.displayName} size="xs" speaking={snapshot.selfSpeaking} />
-                        {user.displayName}
+                        <span className="member-name">{user.displayName}</span>
+                        <MemberIcons
+                          muted={snapshot.microphoneMuted || snapshot.deafened}
+                          deafened={snapshot.deafened}
+                        />
                       </li>
                       {snapshot.participants.map((p) => (
-                        <li key={p.id}>
-                          <Avatar name={p.name} size="xs" speaking={p.speaking} />
-                          {p.name}
+                        <li
+                          key={p.id}
+                          title="Right-click for volume"
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setMenu({ participantId: p.id, x: e.clientX, y: e.clientY });
+                          }}
+                        >
+                          <Avatar name={p.name} size="xs" speaking={p.speaking} muted={p.locallyMuted} />
+                          <span className="member-name">{p.name}</span>
+                          <MemberIcons muted={p.muted} deafened={false} locallyMuted={p.locallyMuted} />
                         </li>
                       ))}
                     </ul>
@@ -197,7 +224,53 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <CreateChannelDialog communityId={community.id} onClose={() => setDialog(null)} />
       )}
       {dialog === "settings" && <SettingsDialog user={user} onClose={() => setDialog(null)} />}
+      {menu && <ParticipantMenu target={menu} onClose={() => setMenu(null)} />}
     </div>
+  );
+}
+
+/**
+ * Occupants of a voice channel we are not in, as reported by the server. (In our own channel the
+ * engine's live list is used instead: it updates instantly and carries speaking indicators.)
+ */
+function ServerMembers({
+  participants,
+  channelName,
+}: {
+  participants: Schemas["VoiceParticipantResponse"][];
+  channelName: string;
+}) {
+  if (participants.length === 0) return null;
+  return (
+    <ul className="channel-members" aria-label={`In ${channelName}`}>
+      {participants.map((p) => (
+        <li key={p.userId}>
+          <Avatar name={p.displayName} size="xs" />
+          <span className="member-name">{p.displayName}</span>
+          <MemberIcons muted={p.muted} deafened={false} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Mic/deafen state next to a name; icons carry labels so state is not color-only. */
+function MemberIcons({
+  muted,
+  deafened,
+  locallyMuted = false,
+}: {
+  muted: boolean;
+  deafened: boolean;
+  locallyMuted?: boolean;
+}) {
+  if (!muted && !deafened && !locallyMuted) return null;
+  return (
+    <span className="member-icons">
+      {muted && <MicOff size={12} aria-label="Microphone muted" />}
+      {deafened && <HeadphoneOff size={12} aria-label="Deafened" />}
+      {locallyMuted && <VolumeX size={12} aria-label="Muted for you" />}
+    </span>
   );
 }
 

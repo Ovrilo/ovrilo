@@ -40,3 +40,9 @@ strip = true
 [target.'cfg(windows)'.dependencies]
 # GetAsyncKeyState for the push-to-talk key (already in the dependency tree via Tauri).
 windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+
+# LOCAL DEVELOPMENT ONLY - replace with a pinned rev before committing.
+[patch."https://github.com/Ovrilo/ovrilo-voice"]
+ovrilo-voice = { path = "../../ovrilo-voice/crates/ovrilo-voice" }
+ovrilo-voice-cpal = { path = "../../ovrilo-voice/crates/ovrilo-voice-cpal" }
+ovrilo-voice-livekit = { path = "../../ovrilo-voice/crates/ovrilo-voice-livekit" }

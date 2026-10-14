@@ -90,6 +90,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/communities/{communityId}/voice-states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists who is in each voice channel of a community the caller can view. Channels nobody is in are omitted. */
+        get: operations["GetVoiceStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -431,11 +448,22 @@ export interface components {
             version: string;
             contractVersion: string;
         };
+        VoiceChannelStateResponse: {
+            /** Format: uuid */
+            channelId: string;
+            participants: components["schemas"]["VoiceParticipantResponse"][];
+        };
         VoiceJoinResponse: {
             serverUrl: string;
             token: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        VoiceParticipantResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            muted: boolean;
         };
     };
     responses: never;
@@ -696,6 +724,53 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetVoiceStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                communityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceChannelStateResponse"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -19,6 +19,12 @@ export interface VoiceParticipant {
   id: string;
   name: string;
   speaking: boolean;
+  /** Local playback volume, percent (100 = unchanged, 0–200). */
+  volume: number;
+  /** Muted for this client only. */
+  locallyMuted: boolean;
+  /** The participant muted their own microphone. */
+  muted: boolean;
 }
 
 export interface VoiceSnapshot {
@@ -146,6 +152,10 @@ export const voice = {
   setInputDevice: (deviceId: string | null) => command("voice_set_input_device", { deviceId }),
   setOutputDevice: (deviceId: string | null) => command("voice_set_output_device", { deviceId }),
   refreshDevices: () => command("voice_refresh_devices"),
+  setParticipantVolume: (participantId: string, percent: number) =>
+    command("voice_set_participant_volume", { participantId, percent: Math.round(percent) }),
+  setParticipantMuted: (participantId: string, muted: boolean) =>
+    command("voice_set_participant_muted", { participantId, muted }),
   setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
   reportFailure,
 };

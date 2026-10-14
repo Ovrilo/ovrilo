@@ -1,10 +1,11 @@
-import { ChevronDown, Copy, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
+import { ChevronDown, Copy, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Volume2, VolumeX } from "lucide-react";
 import { useState } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
 import { QualityBadge } from "./QualityBadge";
 import type { QualitySummary } from "./quality";
+import { ParticipantMenu, type ParticipantMenuTarget } from "./ParticipantMenu";
 import { clearVoiceError, useVoice, useVoiceQuality, voice, voiceAvailable } from "./voice";
 
 interface VoiceRoomProps {
@@ -26,6 +27,7 @@ const STATUS = {
 export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomProps) {
   const { snapshot, lastError } = useVoice();
   const quality = useVoiceQuality();
+  const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
   const here = snapshot.channelId === channel.id && snapshot.connection !== "disconnected";
 
   if (!voiceAvailable) {
@@ -78,6 +80,10 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
   }
 
   const selfMuted = snapshot.microphoneMuted || snapshot.deafened || !snapshot.microphoneActive;
+  // Deafened also mutes; unmuting while deafened undeafens (as in Discord).
+  const micOff = snapshot.microphoneMuted || snapshot.deafened;
+  const toggleMute = () =>
+    void (snapshot.deafened ? voice.setDeafened(false) : voice.setMuted(!snapshot.microphoneMuted));
   return (
     <div className="voice-room">
       <div className="voice-room-status">
@@ -104,12 +110,31 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
           )}
         </li>
         {snapshot.participants.map((p) => (
-          <li key={p.id} className={`participant-tile${p.speaking ? " speaking" : ""}`}>
-            <Avatar name={p.name} size="lg" speaking={p.speaking} />
+          <li
+            key={p.id}
+            className={`participant-tile${p.speaking ? (p.locallyMuted ? " speaking muted" : " speaking") : ""}`}
+            title="Right-click for volume"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ participantId: p.id, x: e.clientX, y: e.clientY });
+            }}
+          >
+            <Avatar name={p.name} size="lg" speaking={p.speaking} muted={p.locallyMuted} />
             <span className="participant-name">
               {p.name}
               {p.speaking && <span className="visually-hidden">, speaking</span>}
             </span>
+            {p.locallyMuted ? (
+              <span className="participant-state">
+                <VolumeX size={14} aria-hidden="true" /> Muted for you
+              </span>
+            ) : p.muted ? (
+              <span className="participant-state">
+                <MicOff size={14} aria-hidden="true" /> Muted
+              </span>
+            ) : (
+              p.volume !== 100 && <span className="participant-volume">{p.volume}%</span>
+            )}
           </li>
         ))}
       </ul>
@@ -119,12 +144,12 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
 
       <div className="voice-room-controls">
         <button
-          className={`control ${snapshot.microphoneMuted ? "is-on" : ""}`}
-          aria-pressed={snapshot.microphoneMuted}
-          onClick={() => void voice.setMuted(!snapshot.microphoneMuted)}
+          className={`control ${micOff ? "is-on" : ""}`}
+          aria-pressed={micOff}
+          onClick={toggleMute}
         >
-          {snapshot.microphoneMuted ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
-          {snapshot.microphoneMuted ? "Unmute" : "Mute"}
+          {micOff ? <MicOff size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
+          {micOff ? "Unmute" : "Mute"}
         </button>
         <button
           className={`control ${snapshot.deafened ? "is-on" : ""}`}
@@ -145,6 +170,7 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
       </div>
 
       <ConnectionDetails summary={quality} />
+      {menu && <ParticipantMenu target={menu} onClose={() => setMenu(null)} />}
     </div>
   );
 }

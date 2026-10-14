@@ -16,14 +16,18 @@ export function Avatar({
   name,
   size = "md",
   speaking = false,
+  muted = false,
 }: {
   name: string;
   size?: "xs" | "sm" | "md" | "lg";
-  /** Green ring while this person talks; pair it with text for screen readers. */
+  /** Ring while this person talks; pair it with text for screen readers. */
   speaking?: boolean;
+  /** Talking but muted for this client: the ring turns red. */
+  muted?: boolean;
 }) {
+  const ring = speaking ? (muted ? " speaking muted" : " speaking") : "";
   return (
-    <span className={`avatar avatar-${size}${speaking ? " speaking" : ""}`} aria-hidden="true">
+    <span className={`avatar avatar-${size}${ring}`} aria-hidden="true">
       {initials(name)}
     </span>
   );

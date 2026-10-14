@@ -4,11 +4,12 @@
 //! as `voice://state-changed`; errors are emitted as `voice://error` and diagnostics (about 1 Hz
 //! while in a room) as `voice://stats`, also appended to a CSV log. Audio never crosses IPC.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ovrilo_voice::{
-    AudioDevice, ConnectionState, DeviceId, VoiceCommand, VoiceEngine, VoiceEngineHandle,
-    VoiceErrorCode, VoiceEvent, VoiceStats,
+    AudioDevice, ConnectionState, DeviceId, ParticipantId, VoiceCommand, VoiceEngine,
+    VoiceEngineHandle, VoiceErrorCode, VoiceEvent, VoiceStats,
 };
 use ovrilo_voice_cpal::CpalBackend;
 use ovrilo_voice_livekit::{LiveKitTransport, ProcessingConfig, webrtc_processing};
@@ -17,7 +18,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::credentials::CommandError;
 use crate::ptt::KeyWatcher;
-use crate::settings::{PushToTalkKey, SettingsStore};
+use crate::settings::{MAX_PARTICIPANT_VOLUMES, PushToTalkKey, SettingsStore};
 use crate::stats_log::StatsLog;
 
 pub const STATE_CHANGED: &str = "voice://state-changed";
@@ -56,6 +57,12 @@ pub struct VoiceSnapshot {
     push_to_talk_key: Option<PushToTalkKey>,
     /// Microphone audio is allowed out right now (see `TransmittingChanged`).
     transmitting: bool,
+    /// Per-user preferences (host-owned, persisted): volume and local mute. The engine gets the
+    /// effective volume (0 while locally muted).
+    #[serde(skip)]
+    volumes: BTreeMap<String, u16>,
+    #[serde(skip)]
+    locally_muted: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,6 +72,12 @@ pub struct ParticipantDto {
     id: String,
     name: String,
     speaking: bool,
+    /// Local playback volume, percent (100 = unchanged).
+    volume: u16,
+    /// Muted for this client only.
+    locally_muted: bool,
+    /// The participant muted their own microphone.
+    muted: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -138,6 +151,8 @@ impl Default for VoiceSnapshot {
             push_to_talk: false,
             push_to_talk_key: None,
             transmitting: true,
+            volumes: BTreeMap::new(),
+            locally_muted: BTreeSet::new(),
         }
     }
 }
@@ -166,6 +181,8 @@ impl VoiceHost {
             input_device_id: saved.input_device_id.clone(),
             output_device_id: saved.output_device_id.clone(),
             push_to_talk_key: saved.push_to_talk_key.clone(),
+            volumes: saved.participant_volumes.clone(),
+            locally_muted: saved.muted_participants.clone(),
             ..VoiceSnapshot::default()
         }));
         let mut stats_log = app.path().app_log_dir().ok().map(StatsLog::new);
@@ -218,6 +235,26 @@ impl VoiceHost {
         engine.send(VoiceCommand::SetOutputDevice(
             saved.output_device_id.map(DeviceId),
         ));
+        let known: BTreeSet<&String> = saved
+            .participant_volumes
+            .keys()
+            .chain(&saved.muted_participants)
+            .collect();
+        for participant in known {
+            let percent = if saved.muted_participants.contains(participant) {
+                0
+            } else {
+                saved
+                    .participant_volumes
+                    .get(participant)
+                    .copied()
+                    .unwrap_or(100)
+            };
+            engine.send(VoiceCommand::SetParticipantVolume {
+                participant: ParticipantId(participant.clone()),
+                percent,
+            });
+        }
         let keys = KeyWatcher::start(engine.clone());
         let ptt_key = saved.push_to_talk_key.filter(|_| saved.push_to_talk);
         keys.watch(ptt_key.as_ref().map(|k| k.code));
@@ -298,17 +335,35 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
         VoiceEvent::DeafenedChanged(deafened) => state.deafened = deafened,
         VoiceEvent::PushToTalkChanged(enabled) => state.push_to_talk = enabled,
+        // Volume and local mute are host preferences, updated by their commands; the engine's
+        // confirmation carries the effective volume only.
+        VoiceEvent::ParticipantVolumeChanged { .. } => return false,
         VoiceEvent::TransmittingChanged(transmitting) => state.transmitting = transmitting,
         VoiceEvent::MicrophoneActiveChanged(active) => state.microphone_active = active,
         VoiceEvent::ParticipantJoined { id, name } => {
             state.participants.retain(|p| p.id != id.0);
+            let volume = state.volumes.get(&id.0).copied().unwrap_or(100);
+            let locally_muted = state.locally_muted.contains(&id.0);
             state.participants.push(ParticipantDto {
                 id: id.0,
                 name,
                 speaking: false,
+                volume,
+                locally_muted,
+                muted: false,
             });
         }
         VoiceEvent::ParticipantLeft { id } => state.participants.retain(|p| p.id != id.0),
+        VoiceEvent::ParticipantMutedChanged { participant, muted } => {
+            match state
+                .participants
+                .iter_mut()
+                .find(|p| p.id == participant.0)
+            {
+                Some(p) if p.muted != muted => p.muted = muted,
+                _ => return false,
+            }
+        }
         VoiceEvent::SpeakingChanged {
             participant: None,
             speaking,
@@ -466,6 +521,110 @@ fn select_device(
     Ok(())
 }
 
+/// Sets how loud one participant plays locally (0–200 %), remembered across restarts.
+#[tauri::command]
+pub fn voice_set_participant_volume(
+    app: AppHandle,
+    host: State<'_, VoiceHost>,
+    participant_id: String,
+    percent: u16,
+) -> Result<(), CommandError> {
+    check_length(&participant_id, 64, "participant id")?;
+    if percent > 200 {
+        return Err(CommandError::new(
+            "voice.invalid_argument",
+            "volume must be 0-200 %",
+        ));
+    }
+    host.settings.update(|s| {
+        if percent == 100 {
+            s.participant_volumes.remove(&participant_id);
+        } else if s.participant_volumes.len() < MAX_PARTICIPANT_VOLUMES
+            || s.participant_volumes.contains_key(&participant_id)
+        {
+            s.participant_volumes
+                .insert(participant_id.clone(), percent);
+        }
+    });
+    host.update(|s| set_participant_preference(s, &participant_id, Some(percent), None));
+    apply_participant_preference(&app, &host, participant_id)
+}
+
+/// Mutes or unmutes one participant for this client only (others still hear them).
+#[tauri::command]
+pub fn voice_set_participant_muted(
+    app: AppHandle,
+    host: State<'_, VoiceHost>,
+    participant_id: String,
+    muted: bool,
+) -> Result<(), CommandError> {
+    check_length(&participant_id, 64, "participant id")?;
+    host.settings.update(|s| {
+        if !muted {
+            s.muted_participants.remove(&participant_id);
+        } else if s.muted_participants.len() < MAX_PARTICIPANT_VOLUMES {
+            s.muted_participants.insert(participant_id.clone());
+        }
+    });
+    host.update(|s| set_participant_preference(s, &participant_id, None, Some(muted)));
+    apply_participant_preference(&app, &host, participant_id)
+}
+
+fn set_participant_preference(
+    state: &mut VoiceSnapshot,
+    id: &str,
+    volume: Option<u16>,
+    muted: Option<bool>,
+) {
+    if let Some(percent) = volume {
+        if percent == 100 {
+            state.volumes.remove(id);
+        } else {
+            state.volumes.insert(id.to_owned(), percent);
+        }
+    }
+    if let Some(muted) = muted {
+        if muted {
+            state.locally_muted.insert(id.to_owned());
+        } else {
+            state.locally_muted.remove(id);
+        }
+    }
+    let volume = state.volumes.get(id).copied().unwrap_or(100);
+    let locally_muted = state.locally_muted.contains(id);
+    if let Some(p) = state.participants.iter_mut().find(|p| p.id == id) {
+        p.volume = volume;
+        p.locally_muted = locally_muted;
+    }
+}
+
+/// Sends the effective volume (0 while locally muted) and publishes the updated snapshot.
+fn apply_participant_preference(
+    app: &AppHandle,
+    host: &State<'_, VoiceHost>,
+    participant_id: String,
+) -> Result<(), CommandError> {
+    let percent = {
+        let state = host.snapshot.lock().unwrap_or_else(PoisonError::into_inner);
+        if state.locally_muted.contains(&participant_id) {
+            0
+        } else {
+            state.volumes.get(&participant_id).copied().unwrap_or(100)
+        }
+    };
+    host.send(VoiceCommand::SetParticipantVolume {
+        participant: ParticipantId(participant_id),
+        percent,
+    })?;
+    let snapshot = host
+        .snapshot
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    let _ = app.emit(STATE_CHANGED, snapshot);
+    Ok(())
+}
+
 /// Turns push-to-talk on (with a key) or off. Saved for the next start; the engine confirms the
 /// mode with `PushToTalkChanged`.
 #[tauri::command]
@@ -612,5 +771,64 @@ mod speaking_tests {
             VoiceEvent::ConnectionStateChanged(ConnectionState::Disconnected),
         );
         assert!(!state.self_speaking);
+    }
+}
+
+#[cfg(test)]
+mod volume_tests {
+    use ovrilo_voice::ParticipantId;
+
+    use super::*;
+
+    fn join(state: &mut VoiceSnapshot, id: &str) {
+        apply(
+            state,
+            VoiceEvent::ParticipantJoined {
+                id: ParticipantId(id.into()),
+                name: id.into(),
+            },
+        );
+    }
+
+    #[test]
+    fn preferences_apply_to_participants_who_join_later() {
+        let mut state = VoiceSnapshot::default();
+        set_participant_preference(&mut state, "u1", Some(40), None);
+        set_participant_preference(&mut state, "u2", None, Some(true));
+        join(&mut state, "u1");
+        join(&mut state, "u2");
+        assert_eq!(state.participants[0].volume, 40);
+        assert!(!state.participants[0].locally_muted);
+        assert!(state.participants[1].locally_muted);
+        assert_eq!(state.participants[1].volume, 100, "mute keeps the volume");
+    }
+
+    #[test]
+    fn unmuting_restores_the_volume_and_defaults_are_not_stored() {
+        let mut state = VoiceSnapshot::default();
+        join(&mut state, "u1");
+        set_participant_preference(&mut state, "u1", Some(150), Some(true));
+        set_participant_preference(&mut state, "u1", None, Some(false));
+        assert_eq!(state.participants[0].volume, 150);
+        assert!(!state.participants[0].locally_muted);
+
+        set_participant_preference(&mut state, "u1", Some(100), None);
+        assert!(state.volumes.is_empty() && state.locally_muted.is_empty());
+    }
+
+    #[test]
+    fn engine_volume_echo_does_not_overwrite_preferences() {
+        let mut state = VoiceSnapshot::default();
+        join(&mut state, "u1");
+        set_participant_preference(&mut state, "u1", Some(150), Some(true));
+        let changed = apply(
+            &mut state,
+            VoiceEvent::ParticipantVolumeChanged {
+                participant: ParticipantId("u1".into()),
+                percent: 0,
+            },
+        );
+        assert!(!changed);
+        assert_eq!(state.participants[0].volume, 150);
     }
 }

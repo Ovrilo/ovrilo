@@ -2965,7 +2965,6 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=aae83303941010dd54584301b4a2a1a98a86f933#aae83303941010dd54584301b4a2a1a98a86f933"
 dependencies = [
  "tokio",
 ]
@@ -2973,7 +2972,6 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice-cpal"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=aae83303941010dd54584301b4a2a1a98a86f933#aae83303941010dd54584301b4a2a1a98a86f933"
 dependencies = [
  "cpal",
  "ovrilo-voice",
@@ -2984,7 +2982,6 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice-livekit"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=aae83303941010dd54584301b4a2a1a98a86f933#aae83303941010dd54584301b4a2a1a98a86f933"
 dependencies = [
  "futures-util",
  "livekit",
