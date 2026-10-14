@@ -18,11 +18,18 @@ pnpm dev              # UI only in a browser (in-memory session, no OS credentia
 pnpm typecheck        # TypeScript type check
 pnpm test             # unit tests (vitest)
 pnpm build            # build frontend bundle
-pnpm tauri build      # build installer
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored   # includes a real Credential Manager round trip
+pnpm release:build <api-url>   # Windows installer (NSIS) for that API, e.g. https://api.example.com
+# Rust: run inside src-tauri/ so .cargo/config.toml (static CRT, git CLI fetch) applies
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test -- --include-ignored   # includes a real Credential Manager round trip
 ```
+
+## Release builds
+
+`pnpm release:build https://api.<domain>` compiles the API origin into the frontend (`VITE_OVRILO_API_URL`), replaces it in the CSP and produces `src-tauri/target/release/bundle/nsis/Ovrilo_<version>_x64-setup.exe`. The installer is per-user (no admin rights) and unsigned for now, so Windows SmartScreen shows a warning ("More info" → "Run anyway"). Only `https://` URLs are accepted, plus `http://localhost` for local testing.
+
+`ovrilo-voice` is a private Git dependency pinned by revision; fetching it uses the git CLI with your GitHub credentials (CI uses a read-only deploy key, `OVRILO_VOICE_DEPLOY_KEY`).
 
 ## API contract
 
@@ -47,6 +54,6 @@ The vendored contract's `info.version` is the API contract version this desktop 
 
 - Tauri IPC carries coarse commands and throttled events only; never raw PCM audio (ADR-0002).
 - The voice engine (`ovrilo-voice`) is authoritative for voice state; the API is authoritative for identity, channels and messages.
-- Tokens never go to web storage (ADR-0011, ADR-0012). The CSP `connect-src` lists the API origin; add the production API origin before release.
+- Tokens never go to web storage (ADR-0011, ADR-0012). The CSP `connect-src` lists the development API origin; `pnpm release:build` swaps in the release API origin.
 
 See the workspace `AGENTS.md` and `docs/` for ADRs, domain specs and phase plans.

@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "api:sync": "node scripts/sync-openapi.mjs",
     "api:generate": "openapi-typescript api/ovrilo-api.json -o src/api/schema.d.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "release:build": "node scripts/build-release.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",
