@@ -2,6 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useMemo, useSyncExternalStore } from "react";
 
+import type { PushToTalkKey } from "./keys";
 import { summarize, type QualitySummary, type VoiceStats } from "./quality";
 
 /** IPC payloads mirrored from src-tauri/src/voice.rs (docs/development/CONTRACTS.md §4). */
@@ -34,6 +35,11 @@ export interface VoiceSnapshot {
   outputs: VoiceDevice[];
   inputDeviceId: string | null;
   outputDeviceId: string | null;
+  /** Push-to-talk mode as confirmed by the engine, and the saved key. */
+  pushToTalk: boolean;
+  pushToTalkKey: PushToTalkKey | null;
+  /** Microphone audio is allowed out right now (not muted/deafened; PTT key held in PTT mode). */
+  transmitting: boolean;
 }
 
 export interface VoiceError {
@@ -59,6 +65,9 @@ const initialSnapshot: VoiceSnapshot = {
   outputs: [],
   inputDeviceId: null,
   outputDeviceId: null,
+  pushToTalk: false,
+  pushToTalkKey: null,
+  transmitting: true,
 };
 
 interface VoiceStoreState {
@@ -137,5 +146,6 @@ export const voice = {
   setInputDevice: (deviceId: string | null) => command("voice_set_input_device", { deviceId }),
   setOutputDevice: (deviceId: string | null) => command("voice_set_output_device", { deviceId }),
   refreshDevices: () => command("voice_refresh_devices"),
+  setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
   reportFailure,
 };

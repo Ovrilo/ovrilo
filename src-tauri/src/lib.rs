@@ -3,6 +3,8 @@
 //! Tauri commands carry coarse control messages only; audio data never crosses UI IPC (ADR-0002).
 
 mod credentials;
+mod ptt;
+mod settings;
 mod stats_log;
 mod tray;
 mod voice;
@@ -38,6 +40,7 @@ pub fn run() {
             voice::voice_set_output_device,
             voice::voice_refresh_devices,
             voice::voice_stats_log_path,
+            voice::voice_set_push_to_talk,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

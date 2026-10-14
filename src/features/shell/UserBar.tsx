@@ -12,7 +12,13 @@ export function UserBar({ user, onSettings }: { user: Schemas["CurrentUserRespon
       <Avatar name={user.displayName} size="sm" speaking={snapshot.selfSpeaking} />
       <div className="user-bar-name">
         <strong>{user.displayName}</strong>
-        <span className="muted">@{user.username}</span>
+        {snapshot.pushToTalk && snapshot.pushToTalkKey ? (
+          <span className={snapshot.transmitting ? "ptt-live" : "muted"}>
+            {snapshot.transmitting ? "Talking" : `Push to talk: ${snapshot.pushToTalkKey.label}`}
+          </span>
+        ) : (
+          <span className="muted">@{user.username}</span>
+        )}
       </div>
       {voiceAvailable && (
         <>

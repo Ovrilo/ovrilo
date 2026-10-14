@@ -1,10 +1,11 @@
-import { LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { Keyboard, LogOut, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { useSession } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
 import { Avatar } from "../../components/ui";
+import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
 type Tab = "audio" | "account";
@@ -57,11 +58,95 @@ function AudioSettings() {
       <button className="ghost with-icon" onClick={() => void voice.refreshDevices()}>
         <RefreshCw size={14} aria-hidden="true" /> Refresh devices
       </button>
+      <InputMode />
       <p className="muted small">
         Changes apply immediately, also during a call. Echo cancellation, noise suppression and automatic gain are always
         on for now.
       </p>
     </div>
+  );
+}
+
+function InputMode() {
+  const { snapshot } = useVoice();
+  const [binding, setBinding] = useState(false);
+  const key = snapshot.pushToTalkKey;
+
+  const choose = (next: PushToTalkKey) => {
+    setBinding(false);
+    void voice.setPushToTalk(true, next);
+  };
+
+  return (
+    <fieldset className="input-mode">
+      <legend>Input mode</legend>
+      <label className="radio">
+        <input
+          type="radio"
+          name="input-mode"
+          checked={!snapshot.pushToTalk}
+          onChange={() => void voice.setPushToTalk(false, key)}
+        />
+        Voice activity <span className="muted small">— your microphone is open while unmuted</span>
+      </label>
+      <label className="radio">
+        <input
+          type="radio"
+          name="input-mode"
+          checked={snapshot.pushToTalk}
+          onChange={() => (key ? void voice.setPushToTalk(true, key) : setBinding(true))}
+        />
+        Push to talk <span className="muted small">— hold a key to talk, also while a game has focus</span>
+      </label>
+      <div className="ptt-key">
+        <span className="muted small">Push-to-talk key</span>
+        {binding ? (
+          <KeyCapture onKey={choose} onCancel={() => setBinding(false)} />
+        ) : (
+          <button className="with-icon" onClick={() => setBinding(true)}>
+            <Keyboard size={14} aria-hidden="true" />
+            {key ? key.label : "Set a key"}
+          </button>
+        )}
+      </div>
+      <p className="muted small">
+        The key still reaches your game. Mouse side buttons work too. Games running as administrator may need Ovrilo
+        to run as administrator as well.
+      </p>
+    </fieldset>
+  );
+}
+
+/** Waits for one key press or middle/side mouse button. Escape cancels. */
+function KeyCapture({ onKey, onCancel }: { onKey: (key: PushToTalkKey) => void; onCancel: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.code === "Escape") return onCancel();
+      const key = keyFromCode(event.code);
+      if (key) onKey(key);
+    };
+    const onMouseDown = (event: MouseEvent) => {
+      const key = keyFromMouseButton(event.button);
+      if (key) {
+        event.preventDefault();
+        onKey(key);
+      }
+    };
+    // Capture phase so the dialog's own Escape handling does not close it first.
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("mousedown", onMouseDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("mousedown", onMouseDown, true);
+    };
+  }, [onKey, onCancel]);
+
+  return (
+    <span className="key-capture" role="status">
+      Press a key or mouse side button… <span className="muted small">(Esc to cancel)</span>
+    </span>
   );
 }
 

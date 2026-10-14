@@ -1021,6 +1021,54 @@ select:focus {
   gap: var(--space-4);
 }
 
+.input-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.input-mode legend {
+  float: left;
+  margin-bottom: var(--space-1);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.input-mode .radio {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.input-mode .radio input {
+  min-height: auto;
+}
+
+.ptt-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+}
+
+.key-capture {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--primary);
+  border-radius: var(--radius-control);
+  color: var(--primary);
+}
+
+.ptt-live {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .account-card {
   display: flex;
   align-items: center;

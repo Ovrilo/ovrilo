@@ -16,6 +16,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::credentials::CommandError;
+use crate::ptt::KeyWatcher;
+use crate::settings::{PushToTalkKey, SettingsStore};
 use crate::stats_log::StatsLog;
 
 pub const STATE_CHANGED: &str = "voice://state-changed";
@@ -49,6 +51,11 @@ pub struct VoiceSnapshot {
     /// Selected devices; `None` follows the system default.
     input_device_id: Option<String>,
     output_device_id: Option<String>,
+    /// Push-to-talk mode as confirmed by the engine, and the configured key (if any).
+    push_to_talk: bool,
+    push_to_talk_key: Option<PushToTalkKey>,
+    /// Microphone audio is allowed out right now (see `TransmittingChanged`).
+    transmitting: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -128,6 +135,9 @@ impl Default for VoiceSnapshot {
             outputs: Vec::new(),
             input_device_id: None,
             output_device_id: None,
+            push_to_talk: false,
+            push_to_talk_key: None,
+            transmitting: true,
         }
     }
 }
@@ -136,6 +146,8 @@ pub struct VoiceHost {
     engine: VoiceEngineHandle,
     snapshot: Arc<Mutex<VoiceSnapshot>>,
     stats_log_path: Option<String>,
+    settings: SettingsStore,
+    keys: KeyWatcher,
 }
 
 impl VoiceHost {
@@ -148,7 +160,14 @@ impl VoiceHost {
                 webrtc_processing(ProcessingConfig::default()),
             )
         });
-        let snapshot = Arc::new(Mutex::new(VoiceSnapshot::default()));
+        let settings = SettingsStore::load(app.path().app_config_dir().ok());
+        let saved = settings.get();
+        let snapshot = Arc::new(Mutex::new(VoiceSnapshot {
+            input_device_id: saved.input_device_id.clone(),
+            output_device_id: saved.output_device_id.clone(),
+            push_to_talk_key: saved.push_to_talk_key.clone(),
+            ..VoiceSnapshot::default()
+        }));
         let mut stats_log = app.path().app_log_dir().ok().map(StatsLog::new);
         let stats_log_path = stats_log
             .as_ref()
@@ -191,11 +210,25 @@ impl VoiceHost {
             }
         });
 
+        // Restore saved preferences. A saved device that is gone fails when opened and is reported
+        // as a device error, so the user can pick another.
+        engine.send(VoiceCommand::SetInputDevice(
+            saved.input_device_id.map(DeviceId),
+        ));
+        engine.send(VoiceCommand::SetOutputDevice(
+            saved.output_device_id.map(DeviceId),
+        ));
+        let keys = KeyWatcher::start(engine.clone());
+        let ptt_key = saved.push_to_talk_key.filter(|_| saved.push_to_talk);
+        keys.watch(ptt_key.as_ref().map(|k| k.code));
+        engine.send(VoiceCommand::SetPushToTalk(ptt_key.is_some()));
         engine.send(VoiceCommand::RefreshDevices);
         Self {
             engine,
             snapshot,
             stats_log_path,
+            settings,
+            keys,
         }
     }
 
@@ -264,6 +297,8 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
         }
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
         VoiceEvent::DeafenedChanged(deafened) => state.deafened = deafened,
+        VoiceEvent::PushToTalkChanged(enabled) => state.push_to_talk = enabled,
+        VoiceEvent::TransmittingChanged(transmitting) => state.transmitting = transmitting,
         VoiceEvent::MicrophoneActiveChanged(active) => state.microphone_active = active,
         VoiceEvent::ParticipantJoined { id, name } => {
             state.participants.retain(|p| p.id != id.0);
@@ -413,6 +448,13 @@ fn select_device(
         VoiceCommand::SetOutputDevice(engine_id)
     })?;
     // The engine reports device failures as errors; the selection itself has no engine event.
+    host.settings.update(|s| {
+        if input {
+            s.input_device_id = device_id.clone();
+        } else {
+            s.output_device_id = device_id.clone();
+        }
+    });
     host.update(|s| {
         if input {
             s.input_device_id = device_id;
@@ -420,6 +462,37 @@ fn select_device(
             s.output_device_id = device_id;
         }
     });
+    let _ = app.emit(STATE_CHANGED, voice_get_state(host));
+    Ok(())
+}
+
+/// Turns push-to-talk on (with a key) or off. Saved for the next start; the engine confirms the
+/// mode with `PushToTalkChanged`.
+#[tauri::command]
+pub fn voice_set_push_to_talk(
+    app: AppHandle,
+    host: State<'_, VoiceHost>,
+    enabled: bool,
+    key: Option<PushToTalkKey>,
+) -> Result<(), CommandError> {
+    if let Some(key) = &key {
+        key.validate()
+            .map_err(|message| CommandError::new("voice.invalid_argument", message))?;
+    }
+    if enabled && key.is_none() {
+        return Err(CommandError::new(
+            "voice.invalid_argument",
+            "choose a push-to-talk key first",
+        ));
+    }
+    host.settings.update(|s| {
+        s.push_to_talk = enabled;
+        s.push_to_talk_key = key.clone();
+    });
+    host.keys
+        .watch(key.as_ref().filter(|_| enabled).map(|k| k.code));
+    host.send(VoiceCommand::SetPushToTalk(enabled))?;
+    host.update(|s| s.push_to_talk_key = key);
     let _ = app.emit(STATE_CHANGED, voice_get_state(host));
     Ok(())
 }
