@@ -6,7 +6,8 @@ name: Release
 #
 # Requires (repository settings of Ovrilo/ovrilo):
 #   secrets.TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD  updater signing key
-#   secrets.RELEASES_TOKEN       fine-grained token: Contents read/write on Ovrilo/ovrilo-releases only
+#   vars.RELEASE_APP_CLIENT_ID / secrets.RELEASE_APP_PRIVATE_KEY  GitHub App installed only on
+#                                Ovrilo/ovrilo-releases with Contents read/write
 #   secrets.OVRILO_VOICE_DEPLOY_KEY  read-only access to the private voice engine (as in rust.yml)
 #   vars.OVRILO_API_URL          https API origin compiled into the release
 
@@ -129,9 +130,18 @@ jobs:
             fs.writeFileSync("dist-release/latest.json", JSON.stringify(manifest, null, 2));
           '
           ls -la dist-release
+      # Short-lived token, limited to the releases repository and to writing its contents.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: releases-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: Ovrilo
+          repositories: ovrilo-releases
+          permission-contents: write
       - name: Create draft release in the public releases repository
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ steps.releases-token.outputs.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           prerelease=""
