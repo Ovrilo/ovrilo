@@ -72,9 +72,12 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
               </h2>
               <ul>
                 {group.items.map((member) => (
-                  <li key={member.userId} className={`member-row${group.label === "Offline" ? " offline" : ""}`}>
+                  <li
+                    key={member.userId}
+                    className={`member-row avatar-hover-scope${group.label === "Offline" ? " offline" : ""}`}
+                  >
                     <span className="presence-avatar">
-                      <Avatar name={memberName(member)} size="sm" />
+                      <Avatar name={memberName(member)} assetId={member.avatarAssetId} size="sm" />
                       <span
                         className={`presence-dot${group.label === "Online" ? " online" : ""}`}
                         role="img"

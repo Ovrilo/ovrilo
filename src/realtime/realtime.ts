@@ -9,6 +9,8 @@ export interface RealtimeEvents {
   MessageDeleted: Schemas["MessageResponse"];
   ReadStateUpdated: Schemas["ReadStateResponse"];
   PresenceChanged: { userId: string; online: boolean };
+  UserUpdated: { userId: string; displayName: string; avatarAssetId: string | null };
+  CommunityUpdated: { communityId: string; name: string; description: string | null; iconAssetId: string | null };
 }
 
 /** Members of a community online right now (SubscribeCommunity). */

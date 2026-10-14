@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { useApi } from "../../auth/SessionContext";
 
@@ -59,6 +60,15 @@ export function useChannels(communityId: string | null) {
       return data;
     },
   });
+}
+
+/**
+ * Avatar asset IDs of a community's members by user ID, for views that only know user IDs (voice
+ * participants come from the voice engine). Reuses the members list query.
+ */
+export function useMemberAvatars(communityId: string | null): ReadonlyMap<string, string | null> {
+  const members = useMembers(communityId);
+  return useMemo(() => new Map((members.data ?? []).map((m) => [m.userId, m.avatarAssetId])), [members.data]);
 }
 
 export function useMembers(communityId: string | null) {

@@ -36,6 +36,26 @@ export function upsertMessage(history: History | undefined, message: Message): H
   return { ...history, pages };
 }
 
+/** Shows someone's new name/picture on messages already loaded. Returns the same object when nothing changed. */
+export function withAuthorProfile(
+  history: History | undefined,
+  userId: string,
+  displayName: string,
+  avatarAssetId: string | null,
+): History | undefined {
+  if (!history) return history;
+  let changed = false;
+  const pages = history.pages.map((page) => {
+    if (!page.messages.some((m) => m.author.id === userId)) return page;
+    changed = true;
+    return {
+      ...page,
+      messages: page.messages.map((m) => (m.author.id === userId ? { ...m, author: { id: userId, displayName, avatarAssetId } } : m)),
+    };
+  });
+  return changed ? { ...history, pages } : history;
+}
+
 /** All loaded, non-deleted messages in ascending order. */
 export function visibleMessages(history: History | undefined): Message[] {
   if (!history) return [];

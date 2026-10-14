@@ -10,7 +10,7 @@ export function UserBar({ user, onSettings }: { user: Schemas["CurrentUserRespon
   const micOff = snapshot.microphoneMuted || snapshot.deafened;
   return (
     <footer className="user-bar">
-      <Avatar name={user.displayName} size="sm" speaking={snapshot.selfSpeaking} />
+      <Avatar name={user.displayName} assetId={user.avatarAssetId} size="sm" speaking={snapshot.selfSpeaking} />
       <div className="user-bar-name">
         <strong>{user.displayName}</strong>
         {snapshot.pushToTalk && snapshot.pushToTalkKey ? (

@@ -32,6 +32,7 @@ function authResponse(n: number): Schemas["AuthResponse"] {
       email: "ada@example.com",
       emailVerified: false,
       createdAt: "2026-10-13T00:00:00Z",
+      avatarAssetId: null,
     },
   };
 }
@@ -160,5 +161,18 @@ describe("secondsUntilExpiry", () => {
   it("treats unreadable tokens as expired", () => {
     expect(secondsUntilExpiry("not-a-jwt")).toBe(0);
     expect(secondsUntilExpiry(jwt({ sub: "x" }))).toBe(0);
+  });
+});
+
+describe("SessionManager.updateUser", () => {
+  it("replaces the signed-in user's data but ignores other accounts", async () => {
+    const session = new SessionManager(BASE, memoryStore(), vi.fn());
+    await session.signIn(authResponse(1));
+    const user = authResponse(1).user;
+
+    session.updateUser({ ...user, avatarAssetId: "asset-1" });
+    session.updateUser({ ...user, id: "someone-else", avatarAssetId: "asset-2" });
+
+    expect(session.getState()).toMatchObject({ status: "signedIn", user: { avatarAssetId: "asset-1" } });
   });
 });

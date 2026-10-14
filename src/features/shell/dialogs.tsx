@@ -4,6 +4,9 @@ import { type FormEvent, useState } from "react";
 import { problemMessage, type Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
+import { PicturePicker } from "../../components/PicturePicker";
+import { CommunityIcon } from "../../components/ui";
+import { uploadImage } from "../../media/upload";
 import { queryKeys } from "./queries";
 
 interface DialogProps {
@@ -52,6 +55,43 @@ export function CreateCommunityDialog({ onClose, onCreated }: DialogProps & { on
         <FormError error={mutation.error} />
         <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Create" />
       </form>
+    </Dialog>
+  );
+}
+
+/** Owners pick the community's icon. Members see the change through CommunityUpdated. */
+export function CommunityIconDialog({ community, onClose }: DialogProps & { community: Schemas["CommunityResponse"] }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const apply = (updated: Schemas["CommunityResponse"]) => {
+    queryClient.setQueryData<Schemas["CommunityResponse"][]>(queryKeys.communities, (list) =>
+      list?.map((c) => (c.id === updated.id ? updated : c)),
+    );
+  };
+
+  return (
+    <Dialog title="Community icon" onClose={onClose}>
+      <PicturePicker
+        preview={<CommunityIcon name={community.name} assetId={community.iconAssetId} large />}
+        hasPicture={community.iconAssetId !== null}
+        onUpload={async (file) => {
+          const assetId = await uploadImage(api, file, "communityIcon", community.id);
+          apply(
+            await unwrap(
+              api.PUT("/communities/{communityId}/icon", { params: { path: { communityId: community.id } }, body: { assetId } }),
+            ),
+          );
+        }}
+        onRemove={async () =>
+          apply(await unwrap(api.DELETE("/communities/{communityId}/icon", { params: { path: { communityId: community.id } } })))
+        }
+        hint="Shown to members in the community list. PNG, JPEG, WebP or GIF; animated GIFs up to 8 MB."
+      />
+      <div className="dialog-actions">
+        <button className="primary" onClick={onClose}>
+          Done
+        </button>
+      </div>
     </Dialog>
   );
 }

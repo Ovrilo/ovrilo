@@ -56,6 +56,12 @@ export class SessionManager {
     this.setState({ status: "signedIn", user: auth.user });
   }
 
+  /** Replaces the signed-in account's data after a profile change (for example a new avatar). */
+  updateUser(user: Schemas["CurrentUserResponse"]): void {
+    if (this.state.status !== "signedIn" || this.state.user.id !== user.id) return;
+    this.setState({ status: "signedIn", user });
+  }
+
   /** Revokes the session on the server (best effort) and forgets local credentials. */
   async signOut(): Promise<void> {
     if (this.accessToken) {

@@ -1,9 +1,9 @@
-import { HeadphoneOff, Hash, LogIn, MicOff, Plus, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
+import { HeadphoneOff, Hash, ImageUp, LogIn, MicOff, Plus, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { Avatar, IconButton, initials } from "../../components/ui";
+import { Avatar, CommunityIcon, IconButton } from "../../components/ui";
 import { TextChannel } from "../messages/TextChannel";
 import { type ChannelUnread, isUnread, unreadLabel, useCommunitiesWithUnread, useUnread, useUnreadSync } from "../messages/unread";
 import { SettingsDialog } from "../settings/SettingsDialog";
@@ -14,12 +14,13 @@ import { useVoice, voiceAvailable } from "../voice/voice";
 import { VoiceDock } from "../voice/VoiceDock";
 import { VoiceRoom } from "../voice/VoiceRoom";
 import { MembersPanel } from "./MembersPanel";
-import { CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
-import { useChannels, useCommunities, useVoiceStates } from "./queries";
+import { CommunityIconDialog, CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
+import { useChannels, useCommunities, useMemberAvatars, useVoiceStates } from "./queries";
 import logo from "../../assets/logo.webp";
 import { UserBar } from "./UserBar";
+import { useProfileUpdates } from "./useProfileUpdates";
 
-type OpenDialog = "createCommunity" | "joinCommunity" | "invite" | "createChannel" | "settings" | null;
+type OpenDialog = "createCommunity" | "joinCommunity" | "invite" | "createChannel" | "communityIcon" | "settings" | null;
 type Channel = Schemas["ChannelResponse"];
 
 export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
@@ -31,6 +32,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [showMembers, setShowMembers] = useState(readShowMembers);
   const { snapshot } = useVoice();
   const join = useJoinVoice();
+  useProfileUpdates(user.id);
 
   const community =
     communities.data?.find((c) => c.id === selectedCommunityId) ?? communities.data?.[0] ?? null;
@@ -50,6 +52,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [connectedChannel, setConnectedChannel] = useState<{ id: string; name: string; communityId: string } | null>(
     null,
   );
+  const connectedAvatars = useMemberAvatars(connectedChannel?.communityId ?? null);
   const connectedName =
     connectedChannel?.id === connectedChannelId ? connectedChannel?.name ?? "Voice channel" : "Voice channel";
 
@@ -83,7 +86,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         {communities.data?.map((c) => (
           <button
             key={c.id}
-            className="space-button"
+            className="space-button avatar-hover-scope"
             aria-current={c.id === community?.id}
             aria-label={c.name}
             title={c.name}
@@ -92,7 +95,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             {communitiesWithUnread.has(c.id) && c.id !== community?.id && (
               <span className="space-unread" aria-label="Unread messages" />
             )}
-            {initials(c.name)}
+            <CommunityIcon name={c.name} assetId={c.iconAssetId} />
             {c.id === connectedChannel?.communityId && connectedChannelId && (
               <span className="space-voice-dot" aria-hidden="true" />
             )}
@@ -108,6 +111,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
           <>
             <header className="sidebar-header">
               <h2 title={community.name}>{community.name}</h2>
+              {isOwner && (
+                <IconButton icon={ImageUp} label="Change community icon" onClick={() => setDialog("communityIcon")} />
+              )}
               <IconButton icon={UserPlus} label="Invite people" onClick={() => setDialog("invite")} />
             </header>
             <div className="channel-list">
@@ -127,7 +133,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                   ) : c.id === connectedChannelId ? (
                     <ul className="channel-members" aria-label={`In ${c.name}`}>
                       <li>
-                        <Avatar name={user.displayName} size="xs" speaking={snapshot.selfSpeaking} />
+                        <Avatar name={user.displayName} assetId={user.avatarAssetId} size="xs" speaking={snapshot.selfSpeaking} />
                         <span className="member-name">{user.displayName}</span>
                         <MemberIcons
                           muted={snapshot.microphoneMuted || snapshot.deafened}
@@ -143,7 +149,13 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                             setMenu({ participantId: p.id, x: e.clientX, y: e.clientY });
                           }}
                         >
-                          <Avatar name={p.name} size="xs" speaking={p.speaking} muted={p.locallyMuted} />
+                          <Avatar
+                            name={p.name}
+                            assetId={connectedAvatars.get(p.id)}
+                            size="xs"
+                            speaking={p.speaking}
+                            muted={p.locallyMuted}
+                          />
                           <span className="member-name">{p.name}</span>
                           <MemberIcons muted={p.muted} deafened={false} locallyMuted={p.locallyMuted} />
                         </li>
@@ -249,6 +261,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       {dialog === "createChannel" && community && (
         <CreateChannelDialog communityId={community.id} onClose={() => setDialog(null)} />
       )}
+      {dialog === "communityIcon" && community && (
+        <CommunityIconDialog community={community} onClose={() => setDialog(null)} />
+      )}
       {dialog === "settings" && <SettingsDialog user={user} onClose={() => setDialog(null)} />}
       {menu && <ParticipantMenu target={menu} onClose={() => setMenu(null)} />}
     </div>
@@ -271,7 +286,7 @@ function ServerMembers({
     <ul className="channel-members" aria-label={`In ${channelName}`}>
       {participants.map((p) => (
         <li key={p.userId}>
-          <Avatar name={p.displayName} size="xs" />
+          <Avatar name={p.displayName} assetId={p.avatarAssetId} size="xs" />
           <span className="member-name">{p.displayName}</span>
           <MemberIcons muted={p.muted} deafened={false} />
         </li>

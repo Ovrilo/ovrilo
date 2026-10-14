@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
+import { useMemberAvatars } from "../shell/queries";
 import { QualityBadge } from "./QualityBadge";
 import type { QualitySummary } from "./quality";
 import { ParticipantMenu, type ParticipantMenuTarget } from "./ParticipantMenu";
@@ -28,6 +29,8 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
   const { snapshot, lastError } = useVoice();
   const quality = useVoiceQuality();
   const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
+  // Participants are user IDs from the voice engine; pictures come from the members list.
+  const avatars = useMemberAvatars(channel.communityId);
   const here = snapshot.channelId === channel.id && snapshot.connection !== "disconnected";
 
   if (!voiceAvailable) {
@@ -97,7 +100,7 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
 
       <ul className="participant-grid" aria-label="Participants">
         <li className={`participant-tile self${snapshot.selfSpeaking ? " speaking" : ""}`}>
-          <Avatar name={user.displayName} size="lg" speaking={snapshot.selfSpeaking} />
+          <Avatar name={user.displayName} assetId={user.avatarAssetId} size="lg" speaking={snapshot.selfSpeaking} />
           <span className="participant-name">
             {user.displayName} (you)
             {snapshot.selfSpeaking && <span className="visually-hidden">, speaking</span>}
@@ -112,14 +115,14 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
         {snapshot.participants.map((p) => (
           <li
             key={p.id}
-            className={`participant-tile${p.speaking ? (p.locallyMuted ? " speaking muted" : " speaking") : ""}`}
+            className={`participant-tile avatar-hover-scope${p.speaking ? (p.locallyMuted ? " speaking muted" : " speaking") : ""}`}
             title="Right-click for volume"
             onContextMenu={(e) => {
               e.preventDefault();
               setMenu({ participantId: p.id, x: e.clientX, y: e.clientY });
             }}
           >
-            <Avatar name={p.name} size="lg" speaking={p.speaking} muted={p.locallyMuted} />
+            <Avatar name={p.name} assetId={avatars.get(p.id)} size="lg" speaking={p.speaking} muted={p.locallyMuted} />
             <span className="participant-name">
               {p.name}
               {p.speaking && <span className="visually-hidden">, speaking</span>}

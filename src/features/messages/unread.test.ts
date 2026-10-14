@@ -15,7 +15,7 @@ const message = (id: number, authorId = "ada", channelId = "general"): Message =
   id,
   channelId,
   clientMessageId: `client-${id}`,
-  author: { id: authorId, displayName: authorId },
+  author: { id: authorId, displayName: authorId, avatarAssetId: null },
   content: "hi",
   replyToMessageId: null,
   createdAt: new Date(0).toISOString(),
