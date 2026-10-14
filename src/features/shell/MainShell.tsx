@@ -1,22 +1,28 @@
-import { useState } from "react";
+import { Hash, LogIn, Plus, UserPlus, Volume2 } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { useSession } from "../../auth/SessionContext";
-import { voice, voiceAvailable, useVoice } from "../voice/voice";
-import { VoicePanel } from "../voice/VoicePanel";
+import { Avatar, IconButton, initials } from "../../components/ui";
+import { SettingsDialog } from "../settings/SettingsDialog";
+import { useJoinVoice } from "../voice/useJoinVoice";
+import { useVoice, voiceAvailable } from "../voice/voice";
+import { VoiceDock } from "../voice/VoiceDock";
+import { VoiceRoom } from "../voice/VoiceRoom";
 import { CreateChannelDialog, CreateCommunityDialog, InviteDialog, JoinCommunityDialog } from "./dialogs";
 import { useChannels, useCommunities } from "./queries";
+import logo from "../../assets/logo.webp";
+import { UserBar } from "./UserBar";
 
-type OpenDialog = "createCommunity" | "joinCommunity" | "invite" | "createChannel" | null;
+type OpenDialog = "createCommunity" | "joinCommunity" | "invite" | "createChannel" | "settings" | null;
+type Channel = Schemas["ChannelResponse"];
 
 export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
-  const { session } = useSession();
   const communities = useCommunities();
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(null);
-  const { snapshot: voiceState } = useVoice();
-  const connectedChannelId = voiceState.connection === "disconnected" ? null : voiceState.channelId;
+  const { snapshot } = useVoice();
+  const join = useJoinVoice();
 
   const community =
     communities.data?.find((c) => c.id === selectedCommunityId) ?? communities.data?.[0] ?? null;
@@ -24,10 +30,34 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const channel = channels.data?.find((c) => c.id === selectedChannelId) ?? null;
   const isOwner = community?.myRole === "owner";
 
+  // The room the engine is in; its channel may belong to another community than the one shown.
+  const connectedChannelId = snapshot.connection === "disconnected" ? null : snapshot.channelId;
+  const [connectedChannel, setConnectedChannel] = useState<{ id: string; name: string; communityId: string } | null>(
+    null,
+  );
+  const connectedName =
+    connectedChannel?.id === connectedChannelId ? connectedChannel?.name ?? "Voice channel" : "Voice channel";
+
   const selectCommunity = (id: string) => {
     setSelectedCommunityId(id);
     setSelectedChannelId(null);
   };
+
+  const joinVoice = (target: Channel) => {
+    setConnectedChannel({ id: target.id, name: target.name, communityId: target.communityId });
+    join.mutate(target.id);
+  };
+
+  /** One click joins a voice channel (DESIGN.md §5.1) unless that would silently leave another room. */
+  const openChannel = (target: Channel) => {
+    setSelectedChannelId(target.id);
+    if (target.type === "voice" && voiceAvailable && !connectedChannelId && !join.isPending) {
+      joinVoice(target);
+    }
+  };
+
+  const voiceChannels = channels.data?.filter((c) => c.type === "voice") ?? [];
+  const textChannels = channels.data?.filter((c) => c.type === "text") ?? [];
 
   return (
     <div className="app-shell">
@@ -37,18 +67,19 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             key={c.id}
             className="space-button"
             aria-current={c.id === community?.id}
+            aria-label={c.name}
             title={c.name}
             onClick={() => selectCommunity(c.id)}
           >
             {initials(c.name)}
+            {c.id === connectedChannel?.communityId && connectedChannelId && (
+              <span className="space-voice-dot" aria-hidden="true" />
+            )}
           </button>
         ))}
-        <button className="space-button add" title="Create a community" onClick={() => setDialog("createCommunity")}>
-          +
-        </button>
-        <button className="space-button add" title="Join with an invitation" onClick={() => setDialog("joinCommunity")}>
-          ⇥
-        </button>
+        <span className="rail-divider" aria-hidden="true" />
+        <IconButton icon={Plus} label="Create a community" className="rail-action" onClick={() => setDialog("createCommunity")} />
+        <IconButton icon={LogIn} label="Join with an invitation" className="rail-action" onClick={() => setDialog("joinCommunity")} />
       </nav>
 
       <aside className="channel-sidebar" aria-label="Channels">
@@ -56,74 +87,103 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
           <>
             <header className="sidebar-header">
               <h2 title={community.name}>{community.name}</h2>
-              <button className="ghost" onClick={() => setDialog("invite")}>
-                Invite
-              </button>
+              <IconButton icon={UserPlus} label="Invite people" onClick={() => setDialog("invite")} />
             </header>
-            <ChannelGroup
-              title="Voice"
-              channels={channels.data?.filter((c) => c.type === "voice") ?? []}
-              selectedId={channel?.id}
-              connectedId={connectedChannelId}
-              onSelect={setSelectedChannelId}
-            />
-            <ChannelGroup
-              title="Text"
-              channels={channels.data?.filter((c) => c.type === "text") ?? []}
-              selectedId={channel?.id}
-              onSelect={setSelectedChannelId}
-            />
-            {isOwner && (
-              <button className="ghost add-channel" onClick={() => setDialog("createChannel")}>
-                + Add channel
-              </button>
-            )}
-            {channels.isError && <p className="form-error">Channels could not be loaded.</p>}
+            <div className="channel-list">
+              <ChannelGroup
+                title="Voice"
+                channels={voiceChannels}
+                selectedId={channel?.id}
+                canCreate={isOwner}
+                onCreate={() => setDialog("createChannel")}
+                onSelect={openChannel}
+                renderExtra={(c) =>
+                  c.id === connectedChannelId ? (
+                    <ul className="channel-members" aria-label={`In ${c.name}`}>
+                      <li>
+                        <Avatar name={user.displayName} size="xs" speaking={snapshot.selfSpeaking} />
+                        {user.displayName}
+                      </li>
+                      {snapshot.participants.map((p) => (
+                        <li key={p.id}>
+                          <Avatar name={p.name} size="xs" speaking={p.speaking} />
+                          {p.name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null
+                }
+              />
+              <ChannelGroup
+                title="Text"
+                channels={textChannels}
+                selectedId={channel?.id}
+                canCreate={isOwner}
+                onCreate={() => setDialog("createChannel")}
+                onSelect={openChannel}
+              />
+              {channels.isSuccess && channels.data.length === 0 && (
+                <p className="muted small sidebar-hint">
+                  {isOwner ? "No channels yet. Create a voice channel to start talking." : "No channels yet."}
+                </p>
+              )}
+              {channels.isError && <p className="form-error small">Channels could not be loaded.</p>}
+            </div>
           </>
         ) : (
-          <p className="muted">{communities.isPending ? "Loading…" : "Create or join a community to get started."}</p>
+          <div className="sidebar-empty">
+            <p className="muted">{communities.isPending ? "Loading…" : "Create or join a community to get started."}</p>
+          </div>
         )}
 
-        <footer className="user-strip">
-          <div>
-            <strong>{user.displayName}</strong>
-            <span className="muted">@{user.username}</span>
-          </div>
-          <button
-            className="ghost"
-            onClick={() => {
-              // The room grant belongs to this account; never stay connected after signing out.
-              if (voiceAvailable) void voice.leave();
-              void session.signOut();
+        <div className="sidebar-footer">
+          <VoiceDock
+            channelName={connectedName}
+            onOpen={() => {
+              if (connectedChannel) {
+                setSelectedCommunityId(connectedChannel.communityId);
+                setSelectedChannelId(connectedChannel.id);
+              }
             }}
-          >
-            Sign out
-          </button>
-        </footer>
+          />
+          <UserBar user={user} onSettings={() => setDialog("settings")} />
+        </div>
       </aside>
 
       <main className="main-pane">
         {channel ? (
           <>
             <header className="channel-header">
-              <h1>
-                {channel.type === "text" ? "# " : "🔊 "}
-                {channel.name}
-              </h1>
-              {channel.topic && <span className="muted">{channel.topic}</span>}
+              {channel.type === "text" ? (
+                <Hash size={18} aria-hidden="true" />
+              ) : (
+                <Volume2 size={18} aria-hidden="true" />
+              )}
+              <h1>{channel.name}</h1>
+              {channel.topic && <span className="muted channel-topic">{channel.topic}</span>}
             </header>
             {channel.type === "voice" ? (
-              <VoicePanel key={channel.id} channel={channel} />
+              <VoiceRoom
+                key={channel.id}
+                channel={channel}
+                user={user}
+                otherChannelName={connectedChannelId && connectedChannelId !== channel.id ? connectedName : null}
+                join={{ mutate: () => joinVoice(channel), isPending: join.isPending, error: join.error }}
+              />
             ) : (
               <div className="empty-state">
-                <p className="muted">Text messaging is not available yet.</p>
+                <Hash size={32} aria-hidden="true" />
+                <p className="muted">Text messaging arrives in a later update.</p>
               </div>
             )}
           </>
         ) : (
           <div className="empty-state">
+            <img src={logo} alt="" width={72} height={72} className="empty-logo" />
             <h1>Ovrilo</h1>
-            <p className="muted">{community ? "Select a channel." : "No community selected."}</p>
+            <p className="muted">
+              {community ? "Pick a voice channel to start talking." : "Create a community or join one with an invite."}
+            </p>
           </div>
         )}
       </main>
@@ -136,6 +196,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       {dialog === "createChannel" && community && (
         <CreateChannelDialog communityId={community.id} onClose={() => setDialog(null)} />
       )}
+      {dialog === "settings" && <SettingsDialog user={user} onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -144,38 +205,37 @@ function ChannelGroup({
   title,
   channels,
   selectedId,
-  connectedId,
+  canCreate,
+  onCreate,
   onSelect,
+  renderExtra,
 }: {
   title: string;
-  channels: Schemas["ChannelResponse"][];
+  channels: Channel[];
   selectedId: string | undefined;
-  connectedId?: string | null;
-  onSelect: (id: string) => void;
+  canCreate: boolean;
+  onCreate: () => void;
+  onSelect: (channel: Channel) => void;
+  renderExtra?: (channel: Channel) => ReactNode;
 }) {
-  if (channels.length === 0) return null;
+  if (channels.length === 0 && !canCreate) return null;
   return (
     <section className="channel-group">
-      <h3>{title}</h3>
+      <header>
+        <h3>{title}</h3>
+        {canCreate && <IconButton icon={Plus} label={`Create ${title.toLowerCase()} channel`} className="small" onClick={onCreate} />}
+      </header>
       <ul>
         {channels.map((c) => (
           <li key={c.id}>
-            <button className="channel-row" aria-current={c.id === selectedId} onClick={() => onSelect(c.id)}>
-              <span aria-hidden="true">{c.type === "text" ? "#" : "🔊"}</span> {c.name}
-              {c.id === connectedId && <span className="voice-dot connected" title="You are in this channel" />}
+            <button className="channel-row" aria-current={c.id === selectedId} onClick={() => onSelect(c)}>
+              {c.type === "text" ? <Hash size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
+              <span>{c.name}</span>
             </button>
+            {renderExtra?.(c)}
           </li>
         ))}
       </ul>
     </section>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join("");
 }

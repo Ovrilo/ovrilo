@@ -45,9 +45,10 @@ The vendored contract's `info.version` is the API contract version this desktop 
 
 - `src/api/` — generated schema types and the `openapi-fetch` client.
 - `src/auth/` — `SessionManager` (memory access token, single-flight refresh, retry on 401) and credential storage.
-- `src/features/` — screens (`auth`, `shell`).
+- `src/features/` — screens (`auth`, `shell`, `voice`, `settings`); `voice/quality.ts` turns engine stats into the connection rating.
 - `src/styles/tokens.css` — design tokens (see `docs/design/DESIGN.md`); do not hard-code colors.
 - `src-tauri/src/credentials.rs` — refresh token in Windows Credential Manager.
+- `src-tauri/src/voice.rs` — voice engine host and IPC; `stats_log.rs` writes `voice-stats.csv` to the app log directory; `tray.rs` keeps Ovrilo (and the call) running in the tray when the window is closed.
 - `src-tauri/capabilities/` — Tauri permissions; keep least-privilege.
 
 ## Architecture rules

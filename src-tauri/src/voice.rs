@@ -1,23 +1,26 @@
 //! Voice engine host: owns the `ovrilo-voice` engine and translates it to IPC (CONTRACTS.md §4).
 //!
 //! The engine is authoritative. The host folds engine events into a [`VoiceSnapshot`] and emits it
-//! as `voice://state-changed`; errors are emitted as `voice://error`. Audio never crosses IPC.
+//! as `voice://state-changed`; errors are emitted as `voice://error` and diagnostics (about 1 Hz
+//! while in a room) as `voice://stats`, also appended to a CSV log. Audio never crosses IPC.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ovrilo_voice::{
     AudioDevice, ConnectionState, DeviceId, VoiceCommand, VoiceEngine, VoiceEngineHandle,
-    VoiceErrorCode, VoiceEvent,
+    VoiceErrorCode, VoiceEvent, VoiceStats,
 };
 use ovrilo_voice_cpal::CpalBackend;
 use ovrilo_voice_livekit::{LiveKitTransport, ProcessingConfig, webrtc_processing};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::credentials::CommandError;
+use crate::stats_log::StatsLog;
 
 pub const STATE_CHANGED: &str = "voice://state-changed";
 pub const ERROR: &str = "voice://error";
+pub const STATS: &str = "voice://stats";
 
 /// Bounds for values the UI passes through to the engine.
 const MAX_TOKEN_LENGTH: usize = 4096;
@@ -38,6 +41,8 @@ pub struct VoiceSnapshot {
     deafened: bool,
     /// False while in a room means listen-only (no microphone could be opened).
     microphone_active: bool,
+    /// The local user is talking (never while muted or deafened).
+    self_speaking: bool,
     participants: Vec<ParticipantDto>,
     inputs: Vec<DeviceDto>,
     outputs: Vec<DeviceDto>,
@@ -52,6 +57,7 @@ pub struct ParticipantDto {
     /// SFU identity: the user ID issued by the API.
     id: String,
     name: String,
+    speaking: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,6 +66,45 @@ pub struct DeviceDto {
     id: String,
     name: String,
     is_default: bool,
+}
+
+/// Diagnostics for the current room; counters are cumulative since joining.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceStatsDto {
+    pub round_trip_ms: Option<u32>,
+    pub inbound_packets_received: u64,
+    pub inbound_packets_lost: u64,
+    pub inbound_jitter_ms: Option<u32>,
+    /// Audible concealment: remote audio synthesized to hide loss (sounds robotic).
+    pub inbound_concealed_ms: u64,
+    pub outbound_packets_lost: u64,
+    pub playout_buffered_ms: u32,
+    pub playout_underruns: u64,
+    pub playout_skipped_ms: u64,
+    pub capture_overflow_ms: u64,
+    pub remote_frames_dropped: u64,
+    pub microphone_frames_dropped: u64,
+}
+
+impl From<&VoiceStats> for VoiceStatsDto {
+    fn from(stats: &VoiceStats) -> Self {
+        let network = &stats.network;
+        Self {
+            round_trip_ms: network.round_trip_ms,
+            inbound_packets_received: network.inbound_packets_received,
+            inbound_packets_lost: network.inbound_packets_lost,
+            inbound_jitter_ms: network.inbound_jitter_ms,
+            inbound_concealed_ms: network.inbound_concealed_ms,
+            outbound_packets_lost: network.outbound_packets_lost,
+            playout_buffered_ms: stats.playout_buffered_ms,
+            playout_underruns: stats.playout_underruns,
+            playout_skipped_ms: stats.playout_skipped_ms,
+            capture_overflow_ms: stats.capture_overflow_ms,
+            remote_frames_dropped: stats.remote_frames_dropped,
+            microphone_frames_dropped: stats.microphone_frames_dropped,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -77,6 +122,7 @@ impl Default for VoiceSnapshot {
             microphone_muted: false,
             deafened: false,
             microphone_active: false,
+            self_speaking: false,
             participants: Vec::new(),
             inputs: Vec::new(),
             outputs: Vec::new(),
@@ -89,6 +135,7 @@ impl Default for VoiceSnapshot {
 pub struct VoiceHost {
     engine: VoiceEngineHandle,
     snapshot: Arc<Mutex<VoiceSnapshot>>,
+    stats_log_path: Option<String>,
 }
 
 impl VoiceHost {
@@ -102,10 +149,28 @@ impl VoiceHost {
             )
         });
         let snapshot = Arc::new(Mutex::new(VoiceSnapshot::default()));
+        let mut stats_log = app.path().app_log_dir().ok().map(StatsLog::new);
+        let stats_log_path = stats_log
+            .as_ref()
+            .map(|log| log.path().display().to_string());
 
         let shared = snapshot.clone();
         tauri::async_runtime::spawn(async move {
             while let Some(event) = events.recv().await {
+                if let VoiceEvent::StatsUpdated(stats) = &event {
+                    let dto = VoiceStatsDto::from(stats);
+                    if let Some(log) = stats_log.as_mut() {
+                        let channel = shared
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner)
+                            .channel_id
+                            .clone();
+                        // Small buffered append about once per second.
+                        log.write(channel.as_deref(), &dto);
+                    }
+                    let _ = app.emit(STATS, dto);
+                    continue;
+                }
                 if let VoiceEvent::Error { code, message } = &event {
                     let _ = app.emit(
                         ERROR,
@@ -127,7 +192,11 @@ impl VoiceHost {
         });
 
         engine.send(VoiceCommand::RefreshDevices);
-        Self { engine, snapshot }
+        Self {
+            engine,
+            snapshot,
+            stats_log_path,
+        }
     }
 
     fn send(&self, command: VoiceCommand) -> Result<(), CommandError> {
@@ -139,6 +208,34 @@ impl VoiceHost {
                 "the voice engine is not running",
             ))
         }
+    }
+
+    /// Leaves the room and waits briefly for the engine to confirm (app exit).
+    pub fn leave_before_exit(&self) {
+        let connected = || {
+            self.snapshot
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .connection
+                != "disconnected"
+        };
+        if !connected() || self.send(VoiceCommand::Leave).is_err() {
+            return;
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while connected() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    /// Flips the microphone mute (tray menu). The engine confirms via `MicrophoneMutedChanged`.
+    pub fn toggle_muted(&self) {
+        let muted = self
+            .snapshot
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .microphone_muted;
+        let _ = self.send(VoiceCommand::SetMicrophoneMuted(!muted));
     }
 
     fn update(&self, change: impl FnOnce(&mut VoiceSnapshot)) {
@@ -162,6 +259,7 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
                 state.channel_id = None;
                 state.participants.clear();
                 state.microphone_active = false;
+                state.self_speaking = false;
             }
         }
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
@@ -169,9 +267,30 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
         VoiceEvent::MicrophoneActiveChanged(active) => state.microphone_active = active,
         VoiceEvent::ParticipantJoined { id, name } => {
             state.participants.retain(|p| p.id != id.0);
-            state.participants.push(ParticipantDto { id: id.0, name });
+            state.participants.push(ParticipantDto {
+                id: id.0,
+                name,
+                speaking: false,
+            });
         }
         VoiceEvent::ParticipantLeft { id } => state.participants.retain(|p| p.id != id.0),
+        VoiceEvent::SpeakingChanged {
+            participant: None,
+            speaking,
+        } => {
+            if state.self_speaking == speaking {
+                return false;
+            }
+            state.self_speaking = speaking;
+        }
+        VoiceEvent::SpeakingChanged {
+            participant: Some(id),
+            speaking,
+        } => match state.participants.iter_mut().find(|p| p.id == id.0) {
+            // Events can trail a ParticipantLeft; unknown participants are ignored.
+            Some(p) if p.speaking != speaking => p.speaking = speaking,
+            _ => return false,
+        },
         VoiceEvent::DevicesChanged { inputs, outputs } => {
             state.inputs = inputs.into_iter().map(device).collect();
             state.outputs = outputs.into_iter().map(device).collect();
@@ -207,6 +326,12 @@ fn check_length(value: &str, max: usize, name: &str) -> Result<(), CommandError>
         ));
     }
     Ok(())
+}
+
+/// Where diagnostics are written, so testers can find and share the file.
+#[tauri::command]
+pub fn voice_stats_log_path(host: State<'_, VoiceHost>) -> Option<String> {
+    host.stats_log_path.clone()
 }
 
 #[tauri::command]
@@ -375,5 +500,44 @@ mod tests {
             );
         }
         assert_eq!(state.participants.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod speaking_tests {
+    use ovrilo_voice::ParticipantId;
+
+    use super::*;
+
+    #[test]
+    fn speaking_updates_known_participants_and_self_only() {
+        let mut state = VoiceSnapshot::default();
+        apply(
+            &mut state,
+            VoiceEvent::ParticipantJoined {
+                id: ParticipantId("u1".into()),
+                name: "Ada".into(),
+            },
+        );
+        let speak = |id: Option<&str>, speaking| VoiceEvent::SpeakingChanged {
+            participant: id.map(|id| ParticipantId(id.into())),
+            speaking,
+        };
+
+        assert!(apply(&mut state, speak(Some("u1"), true)));
+        assert!(state.participants[0].speaking);
+        assert!(
+            !apply(&mut state, speak(Some("u1"), true)),
+            "no-op is not a change"
+        );
+        assert!(!apply(&mut state, speak(Some("ghost"), true)));
+        assert!(apply(&mut state, speak(None, true)));
+        assert!(state.self_speaking);
+
+        apply(
+            &mut state,
+            VoiceEvent::ConnectionStateChanged(ConnectionState::Disconnected),
+        );
+        assert!(!state.self_speaking);
     }
 }

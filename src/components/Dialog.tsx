@@ -5,7 +5,17 @@ import { type ReactNode, useEffect, useRef } from "react";
  * unmounting; Escape calls `onClose`. Programmatic close() in cleanup must not call `onClose`, otherwise
  * React StrictMode's effect re-run would immediately dismiss the dialog.
  */
-export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Dialog({
+  title,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -17,7 +27,7 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
   return (
     <dialog
       ref={ref}
-      className="dialog"
+      className={wide ? "dialog dialog-wide" : "dialog"}
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();

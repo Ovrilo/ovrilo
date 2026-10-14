@@ -3,6 +3,8 @@
 //! Tauri commands carry coarse control messages only; audio data never crosses UI IPC (ADR-0002).
 
 mod credentials;
+mod stats_log;
+mod tray;
 mod voice;
 
 use tauri::Manager;
@@ -18,8 +20,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             app.manage(voice::VoiceHost::start(app.handle().clone()));
+            tray::install(app)?;
             Ok(())
         })
+        .on_window_event(tray::on_window_event)
         .invoke_handler(tauri::generate_handler![
             app_version,
             credentials::credentials_load_refresh_token,
@@ -33,7 +37,14 @@ pub fn run() {
             voice::voice_set_input_device,
             voice::voice_set_output_device,
             voice::voice_refresh_devices,
+            voice::voice_stats_log_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Leave cleanly so others see us go now, not after the server's timeout.
+                app.state::<voice::VoiceHost>().leave_before_exit();
+            }
+        });
 }

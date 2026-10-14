@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 
 import { problemMessage } from "../../api/client";
 import { useApi, useSession } from "../../auth/SessionContext";
+import logo from "../../assets/logo.webp";
 
 type Mode = "login" | "register";
 
@@ -55,7 +56,11 @@ export function AuthScreen() {
   return (
     <main className="auth-screen">
       <form className="auth-card" onSubmit={submit} aria-busy={busy}>
-        <h1>Ovrilo</h1>
+        <div className="auth-brand">
+          <img src={logo} alt="" width={64} height={64} />
+          <h1>Ovrilo</h1>
+          <p className="muted">Voice for your crew.</p>
+        </div>
         <div className="segmented" role="tablist" aria-label="Account">
           <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => switchMode("login")}>
             Sign in

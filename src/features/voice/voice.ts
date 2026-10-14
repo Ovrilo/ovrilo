@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+
+import { summarize, type QualitySummary, type VoiceStats } from "./quality";
 
 /** IPC payloads mirrored from src-tauri/src/voice.rs (docs/development/CONTRACTS.md §4). */
 export type VoiceConnection = "disconnected" | "connecting" | "connected" | "reconnecting";
@@ -15,6 +17,7 @@ export interface VoiceParticipant {
   /** SFU identity: the participant's user ID. */
   id: string;
   name: string;
+  speaking: boolean;
 }
 
 export interface VoiceSnapshot {
@@ -24,6 +27,8 @@ export interface VoiceSnapshot {
   deafened: boolean;
   /** False while in a room means listen-only (no microphone could be opened). */
   microphoneActive: boolean;
+  /** The local user is talking (never while muted or deafened). */
+  selfSpeaking: boolean;
   participants: VoiceParticipant[];
   inputs: VoiceDevice[];
   outputs: VoiceDevice[];
@@ -39,12 +44,16 @@ export interface VoiceError {
 /** Voice needs the native host; plain-browser development (`pnpm dev`) has none. */
 export const voiceAvailable = isTauri();
 
+/** Stats samples kept for the quality window (~1 per second). */
+const STATS_WINDOW = 11;
+
 const initialSnapshot: VoiceSnapshot = {
   connection: "disconnected",
   channelId: null,
   microphoneMuted: false,
   deafened: false,
   microphoneActive: false,
+  selfSpeaking: false,
   participants: [],
   inputs: [],
   outputs: [],
@@ -55,9 +64,12 @@ const initialSnapshot: VoiceSnapshot = {
 interface VoiceStoreState {
   snapshot: VoiceSnapshot;
   lastError: VoiceError | null;
+  /** Recent diagnostics for the current room, oldest first. */
+  stats: readonly VoiceStats[];
+  statsLogPath: string | null;
 }
 
-let state: VoiceStoreState = { snapshot: initialSnapshot, lastError: null };
+let state: VoiceStoreState = { snapshot: initialSnapshot, lastError: null, stats: [], statsLogPath: null };
 const listeners = new Set<() => void>();
 let started = false;
 
@@ -66,13 +78,22 @@ function setState(next: Partial<VoiceStoreState>) {
   listeners.forEach((listener) => listener());
 }
 
+function onSnapshot(snapshot: VoiceSnapshot) {
+  const leftRoom = snapshot.connection === "disconnected" || snapshot.channelId !== state.snapshot.channelId;
+  setState({ snapshot, stats: leftRoom ? [] : state.stats });
+}
+
 /** The engine (in Rust) owns voice state; this store only mirrors its events. */
 function start() {
   if (started || !voiceAvailable) return;
   started = true;
-  void listen<VoiceSnapshot>("voice://state-changed", (event) => setState({ snapshot: event.payload }));
+  void listen<VoiceSnapshot>("voice://state-changed", (event) => onSnapshot(event.payload));
   void listen<VoiceError>("voice://error", (event) => setState({ lastError: event.payload }));
-  void invoke<VoiceSnapshot>("voice_get_state").then((snapshot) => setState({ snapshot }));
+  void listen<VoiceStats>("voice://stats", (event) =>
+    setState({ stats: [...state.stats, event.payload].slice(-STATS_WINDOW) }),
+  );
+  void invoke<VoiceSnapshot>("voice_get_state").then(onSnapshot);
+  void invoke<string | null>("voice_stats_log_path").then((statsLogPath) => setState({ statsLogPath }));
 }
 
 function subscribe(listener: () => void) {
@@ -85,6 +106,12 @@ export function useVoice(): VoiceStoreState {
   return useSyncExternalStore(subscribe, () => state);
 }
 
+/** Connection health of the current room over the last ~10 seconds. */
+export function useVoiceQuality(): QualitySummary {
+  const { stats } = useVoice();
+  return useMemo(() => summarize(stats), [stats]);
+}
+
 export function clearVoiceError() {
   setState({ lastError: null });
 }
@@ -95,6 +122,7 @@ function reportFailure(error: unknown) {
 }
 
 function command(name: string, args?: Record<string, unknown>): Promise<void> {
+  if (!voiceAvailable) return Promise.resolve();
   return invoke<void>(name, args).catch(reportFailure);
 }
 
