@@ -32,9 +32,10 @@ tauri-plugin-process = "=2.4.0"
 opt-level = 3
 
 # https://tauri.app/concept/size/#cargo-configuration
+# Thin LTO with default codegen units: most of fat LTO's size and speed benefit at a fraction of the
+# build time (release builds compile Tauri and LiveKit/WebRTC). Measure before going back to fat LTO.
 [profile.release]
-codegen-units = 1
-lto = true
+lto = "thin"
 opt-level = 3
 panic = "abort"
 strip = true

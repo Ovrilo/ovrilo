@@ -87,10 +87,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
           components: rustfmt, clippy
+      # Restores the release-profile cache that release-cache.yml keeps warm on main. Tags cannot read
+      # each other's caches, so saving here would only cost minutes for a cache nobody reads.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
           shared-key: release
+          save-if: false
       - name: Read access to the private ovrilo-voice dependency
         env:
           OVRILO_VOICE_DEPLOY_KEY: ${{ secrets.OVRILO_VOICE_DEPLOY_KEY }}

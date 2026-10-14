@@ -29,6 +29,8 @@ cargo test -- --include-ignored   # includes a real Credential Manager round tri
 
 `pnpm release:build https://api.<domain>` compiles the API origin into the frontend (`VITE_OVRILO_API_URL`), replaces it in the CSP and produces `src-tauri/target/release/bundle/nsis/Ovrilo_<version>_x64-setup.exe`. The installer is per-user (no admin rights) and unsigned for now, so Windows SmartScreen shows a warning ("More info" → "Run anyway"). Only `https://` URLs are accepted, plus `http://localhost` for local testing.
 
+Tagged releases (`release.yml`) restore a release-profile Rust cache that `release-cache.yml` keeps warm on `main` (after host changes and weekly), so a release recompiles only what changed instead of Tauri and LiveKit/WebRTC from scratch. The release profile uses thin LTO for the same reason.
+
 `ovrilo-voice` is a private Git dependency pinned by revision; fetching it uses the git CLI with your GitHub credentials (CI uses a read-only deploy key, `OVRILO_VOICE_DEPLOY_KEY`).
 
 ## API contract
