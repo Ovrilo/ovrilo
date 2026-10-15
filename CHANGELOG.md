@@ -4,6 +4,10 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-15
+
+Screen sharing, a voice room that looks like a call, and community management. Screen sharing needs your server to be updated and to turn it on.
+
 ### New
 - Click the community name for its menu: invite people, community settings, create a channel, leave or delete the community.
 - Community settings: owners can rename the community, describe it and change its icon in one place.
