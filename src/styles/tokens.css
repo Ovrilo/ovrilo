@@ -1,5 +1,7 @@
 /* Design tokens — docs/design/DESIGN.md §4 (proposed palette). */
 :root {
+  /* Native controls (radios, select popups, scrollbars) follow the dark theme. */
+  color-scheme: dark;
   --bg: #0b1017;
   --surface-1: #121a25;
   --surface-2: #1c2938;

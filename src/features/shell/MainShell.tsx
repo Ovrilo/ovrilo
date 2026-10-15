@@ -1,4 +1,4 @@
-import { HeadphoneOff, Hash, ImageUp, LogIn, MicOff, Plus, Settings, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, HeadphoneOff, Hash, LogIn, MicOff, Plus, Settings, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -11,20 +11,23 @@ import { SettingsDialog } from "../settings/SettingsDialog";
 import { UpdateBanner } from "../update/UpdateBanner";
 import { useJoinVoice } from "../voice/useJoinVoice";
 import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/ParticipantMenu";
-import { useVoice, voiceAvailable } from "../voice/voice";
+import { useVoice, voice, voiceAvailable } from "../voice/voice";
 import { VoiceDock } from "../voice/VoiceDock";
 import { VoiceRoom } from "../voice/VoiceRoom";
 import { MembersPanel } from "./MembersPanel";
 import { ChannelMenu, type ChannelMenuTarget } from "./ChannelMenu";
+import { type CommunityAction, CommunityMenu } from "./CommunityMenu";
 import { dropIndex, moveChannel } from "./channelOrder";
 import {
-  CommunityIconDialog,
+  CommunitySettingsDialog,
   CreateChannelDialog,
   CreateCommunityDialog,
   DeleteChannelDialog,
+  DeleteCommunityDialog,
   EditChannelDialog,
   InviteDialog,
   JoinCommunityDialog,
+  LeaveCommunityDialog,
 } from "./dialogs";
 import { queryKeys, useChannels, useCommunities, useMemberAvatars, useVoiceStates } from "./queries";
 import logo from "../../assets/logo.webp";
@@ -37,7 +40,9 @@ type OpenDialog =
   | "createCommunity"
   | "joinCommunity"
   | "invite"
-  | "communityIcon"
+  | "communitySettings"
+  | "deleteCommunity"
+  | "leaveCommunity"
   | "settings"
   | { kind: "createChannel"; type: Channel["type"] }
   | { kind: "editChannel" | "deleteChannel"; channel: Channel }
@@ -51,6 +56,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
   const [channelMenu, setChannelMenu] = useState<ChannelMenuTarget | null>(null);
+  const [communityMenu, setCommunityMenu] = useState<{ x: number; y: number; anchor: HTMLElement } | null>(null);
   const [showMembers, setShowMembers] = useState(readShowMembers);
   const { snapshot } = useVoice();
   const join = useJoinVoice();
@@ -69,7 +75,6 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
 
   // The room the engine is in; its channel may belong to another community than the one shown.
   const connectedChannelId = snapshot.connection === "disconnected" ? null : snapshot.channelId;
-  useChannelUpdates(communities.data?.map((c) => c.id) ?? [], connectedChannelId);
   const move = useMoveChannel();
 
   // Our own join/leave changes occupancy: refresh right away instead of waiting for the next poll.
@@ -80,10 +85,26 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
     null,
   );
   const connectedAvatars = useMemberAvatars(connectedChannel?.communityId ?? null);
+  const connectedCommunityId = connectedChannelId && connectedChannel?.id === connectedChannelId ? connectedChannel.communityId : null;
+  useChannelUpdates(communities.data?.map((c) => c.id) ?? [], connectedChannelId, connectedCommunityId);
   const connectedName =
     connectedChannel?.id === connectedChannelId ? connectedChannel?.name ?? "Voice channel" : "Voice channel";
 
   const selectCommunity = (id: string) => setSelectedCommunityId(id);
+
+  /** We left or deleted a community: hang up if we were talking there, then show another one. */
+  const forgetCommunity = (id: string) => {
+    if (connectedCommunityId === id) void voice.leave();
+    setSelectedCommunityId(null);
+  };
+
+  const onCommunityAction = (action: CommunityAction) => {
+    if (action === "invite") setDialog("invite");
+    else if (action === "settings") setDialog("communitySettings");
+    else if (action === "createChannel") setDialog({ kind: "createChannel", type: "text" });
+    else if (action === "leave") setDialog("leaveCommunity");
+    else setDialog("deleteCommunity");
+  };
   const selectChannel = (target: { id: string; communityId: string }) =>
     setSelectedChannels((current) => ({ ...current, [target.communityId]: target.id }));
 
@@ -142,10 +163,21 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         {community ? (
           <>
             <header className="sidebar-header">
-              <h2 title={community.name}>{community.name}</h2>
-              {isOwner && (
-                <IconButton icon={ImageUp} label="Change community icon" onClick={() => setDialog("communityIcon")} />
-              )}
+              <h2 className="community-title">
+                <button
+                  className="community-menu-button"
+                  aria-haspopup="menu"
+                  aria-expanded={communityMenu !== null}
+                  title={community.description ?? community.name}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setCommunityMenu(communityMenu ? null : { x: rect.left, y: rect.bottom + 4, anchor: e.currentTarget });
+                  }}
+                >
+                  <span>{community.name}</span>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </button>
+              </h2>
               <IconButton icon={UserPlus} label="Invite people" onClick={() => setDialog("invite")} />
             </header>
             <div className="channel-list">
@@ -303,8 +335,28 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       {typeof dialog === "object" && dialog?.kind === "deleteChannel" && (
         <DeleteChannelDialog channel={dialog.channel} onClose={() => setDialog(null)} />
       )}
-      {dialog === "communityIcon" && community && (
-        <CommunityIconDialog community={community} onClose={() => setDialog(null)} />
+      {dialog === "communitySettings" && community && (
+        <CommunitySettingsDialog community={community} onClose={() => setDialog(null)} />
+      )}
+      {dialog === "deleteCommunity" && community && (
+        <DeleteCommunityDialog
+          community={community}
+          onDeleted={() => forgetCommunity(community.id)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "leaveCommunity" && community && (
+        <LeaveCommunityDialog community={community} onLeft={() => forgetCommunity(community.id)} onClose={() => setDialog(null)} />
+      )}
+      {communityMenu && community && (
+        <CommunityMenu
+          community={community}
+          x={communityMenu.x}
+          y={communityMenu.y}
+          anchor={communityMenu.anchor}
+          onAction={onCommunityAction}
+          onClose={() => setCommunityMenu(null)}
+        />
       )}
       {dialog === "settings" && <SettingsDialog user={user} onClose={() => setDialog(null)} />}
       {menu && <ParticipantMenu target={menu} onClose={() => setMenu(null)} />}

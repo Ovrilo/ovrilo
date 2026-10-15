@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import type { Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 
 export const queryKeys = {
@@ -9,6 +10,17 @@ export const queryKeys = {
   voiceStates: (communityId: string) => ["communities", communityId, "voice-states"] as const,
   members: (communityId: string) => ["communities", communityId, "members"] as const,
 };
+
+/**
+ * A community we left or that was deleted: take it out of the list first (so the shell switches to
+ * another one), then drop its cached channels, members and unread state instead of refetching them.
+ */
+export function dropCommunity(queryClient: QueryClient, communityId: string) {
+  queryClient.setQueryData<Schemas["CommunityResponse"][]>(queryKeys.communities, (list) =>
+    list?.filter((c) => c.id !== communityId),
+  );
+  queryClient.removeQueries({ queryKey: ["communities", communityId] });
+}
 
 /** Refresh interval for voice channel occupancy until realtime push (SignalR, Phase 04) replaces it. */
 const VOICE_STATES_REFRESH_MS = 5000;

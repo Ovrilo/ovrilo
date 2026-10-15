@@ -88,7 +88,8 @@ p {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -232,10 +233,73 @@ select {
   font-weight: 400;
 }
 
+textarea {
+  min-height: 76px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 400;
+  line-height: 1.45;
+  resize: vertical;
+}
+
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--primary);
   outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* The webview paints autofilled fields light; keep them in the theme. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  box-shadow: 0 0 0 1000px var(--bg) inset;
+  transition: background-color 9999s ease-out;
+}
+
+/* A select with our own chevron instead of the platform arrow. */
+.select-control {
+  position: relative;
+  display: flex;
+}
+
+.select-control select {
+  flex: 1;
+  min-width: 0;
+  padding-right: 36px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.select-control > svg {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  color: var(--text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+select option {
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.field-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .form-error {
@@ -550,6 +614,45 @@ select:focus {
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The community name opens the community menu. */
+.community-title {
+  flex: 1;
+  min-width: 0;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.community-menu-button {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: inherit;
+}
+
+.community-menu-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-menu-button:hover:not(:disabled),
+.community-menu-button[aria-expanded="true"] {
+  background: var(--surface-2);
+}
+
+.community-menu-button svg {
+  flex: none;
+  color: var(--text-secondary);
+  transition: transform var(--transition);
+}
+
+.community-menu-button[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
 
 .channel-list {
@@ -1474,6 +1577,7 @@ button.small-button {
 .edit-box textarea,
 .composer textarea {
   width: 100%;
+  min-height: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
@@ -1683,30 +1787,102 @@ button.small-button {
   margin-top: var(--space-2);
 }
 
-.segmented-field {
-  display: flex;
-  gap: var(--space-4);
+/* Pick one of a few options, shown as cards (channel type). */
+.choice-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.segmented-field legend {
+.choice-cards legend {
   margin-bottom: var(--space-2);
   color: var(--text-secondary);
   font-size: 13px;
+  font-weight: 500;
 }
 
-.segmented-field label {
+.choice-card {
+  position: relative;
   flex-direction: row;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--text-primary);
-  font-size: 14px;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
 }
 
-.segmented-field input {
-  min-height: auto;
+.choice-card:hover {
+  background: var(--surface-2);
+}
+
+.choice-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice-card:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg));
+}
+
+.choice-card:has(input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.choice-card > svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.choice-card:has(input:checked) > svg {
+  color: var(--primary);
+}
+
+.choice-card strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.choice-card strong + span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-section h3 {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dialog-warning {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  line-height: 1.5;
 }
 
 .invite-code {

@@ -12,6 +12,7 @@ export interface RealtimeEvents {
   UserUpdated: { userId: string; displayName: string; avatarAssetId: string | null };
   CommunityUpdated: { communityId: string; name: string; description: string | null; iconAssetId: string | null };
   ChannelsChanged: { communityId: string; channelId: string; change: "created" | "updated" | "deleted" };
+  CommunityDeleted: { communityId: string };
 }
 
 /** Members of a community online right now (SubscribeCommunity). */

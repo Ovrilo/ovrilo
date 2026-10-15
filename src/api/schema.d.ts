@@ -149,7 +149,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read position, newest message and unread count (capped at 100) of each readable text channel. */
+        /** Read position, newest message and unread count (capped at 100) of each readable text channel. History from before the caller joined counts as read. */
         get: operations["ListCommunityUnread"];
         put?: never;
         post?: never;
@@ -273,10 +273,12 @@ export interface paths {
         get: operations["GetCommunity"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Deletes the community for everyone. Owner only; cannot be undone. */
+        delete: operations["DeleteCommunity"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Renames the community or changes its description. Needs ManageCommunity. */
+        patch: operations["UpdateCommunity"];
         trace?: never;
     };
     "/communities/{communityId}/members": {
@@ -711,6 +713,10 @@ export interface components {
             topic: null | string;
             /** Format: int32 */
             position: null | number;
+        };
+        UpdateCommunityRequest: {
+            name: null | string;
+            description: null | string;
         };
         UploadResponse: {
             /** Format: uuid */
@@ -1513,6 +1519,111 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteCommunity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                communityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateCommunity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                communityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCommunityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Not Found */
             404: {

@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Hash, Volume2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
 import { PicturePicker } from "../../components/PicturePicker";
-import { CommunityIcon } from "../../components/ui";
+import { CommunityIcon, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
-import { queryKeys } from "./queries";
+import { dropCommunity, queryKeys } from "./queries";
 
 interface DialogProps {
   onClose: () => void;
@@ -50,7 +51,8 @@ export function CreateCommunityDialog({ onClose, onCreated }: DialogProps & { on
       >
         <label>
           Name
-          <input name="name" required maxLength={100} autoFocus />
+          <input name="name" required maxLength={100} autoComplete="off" spellCheck={false} placeholder="My crew" autoFocus />
+          <span className="field-hint">It starts with a #general text channel and a General voice channel.</span>
         </label>
         <FormError error={mutation.error} />
         <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Create" />
@@ -59,8 +61,11 @@ export function CreateCommunityDialog({ onClose, onCreated }: DialogProps & { on
   );
 }
 
-/** Owners pick the community's icon. Members see the change through CommunityUpdated. */
-export function CommunityIconDialog({ community, onClose }: DialogProps & { community: Schemas["CommunityResponse"] }) {
+/**
+ * Owners: icon (applied right away), name and description (saved with Save). Members see changes
+ * through CommunityUpdated.
+ */
+export function CommunitySettingsDialog({ community, onClose }: DialogProps & { community: Schemas["CommunityResponse"] }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const apply = (updated: Schemas["CommunityResponse"]) => {
@@ -68,28 +73,155 @@ export function CommunityIconDialog({ community, onClose }: DialogProps & { comm
       list?.map((c) => (c.id === updated.id ? updated : c)),
     );
   };
+  const save = useMutation({
+    mutationFn: (body: Schemas["UpdateCommunityRequest"]) =>
+      unwrap(api.PATCH("/communities/{communityId}", { params: { path: { communityId: community.id } }, body })),
+    onSuccess: (updated) => {
+      apply(updated);
+      onClose();
+    },
+  });
 
   return (
-    <Dialog title="Community icon" onClose={onClose}>
-      <PicturePicker
-        preview={<CommunityIcon name={community.name} assetId={community.iconAssetId} large />}
-        hasPicture={community.iconAssetId !== null}
-        onUpload={async (file) => {
-          const assetId = await uploadImage(api, file, "communityIcon", community.id);
-          apply(
-            await unwrap(
-              api.PUT("/communities/{communityId}/icon", { params: { path: { communityId: community.id } }, body: { assetId } }),
-            ),
-          );
+    <Dialog title="Community settings" onClose={onClose}>
+      <section className="dialog-section">
+        <h3>Icon</h3>
+        <PicturePicker
+          preview={<CommunityIcon name={community.name} assetId={community.iconAssetId} large />}
+          hasPicture={community.iconAssetId !== null}
+          onUpload={async (file) => {
+            const assetId = await uploadImage(api, file, "communityIcon", community.id);
+            apply(
+              await unwrap(
+                api.PUT("/communities/{communityId}/icon", { params: { path: { communityId: community.id } }, body: { assetId } }),
+              ),
+            );
+          }}
+          onRemove={async () =>
+            apply(await unwrap(api.DELETE("/communities/{communityId}/icon", { params: { path: { communityId: community.id } } })))
+          }
+          hint="PNG, JPEG, WebP or GIF; animated GIFs up to 8 MB. Changes apply right away."
+        />
+      </section>
+      <form
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          // An empty description clears it.
+          save.mutate({ name: String(form.get("name") ?? ""), description: String(form.get("description") ?? "") });
         }}
-        onRemove={async () =>
-          apply(await unwrap(api.DELETE("/communities/{communityId}/icon", { params: { path: { communityId: community.id } } })))
-        }
-        hint="Shown to members in the community list. PNG, JPEG, WebP or GIF; animated GIFs up to 8 MB."
-      />
+      >
+        <label>
+          Name
+          <input name="name" required maxLength={100} defaultValue={community.name} autoComplete="off" spellCheck={false} />
+        </label>
+        <label>
+          Description
+          <textarea
+            name="description"
+            maxLength={500}
+            rows={3}
+            defaultValue={community.description ?? ""}
+            placeholder="What is this community about?"
+          />
+        </label>
+        <FormError error={save.error} />
+        <DialogActions onClose={onClose} busy={save.isPending} submitLabel="Save" />
+      </form>
+    </Dialog>
+  );
+}
+
+/** Owners only. Typing the name guards against deleting the wrong community. */
+export function DeleteCommunityDialog({
+  community,
+  onClose,
+  onDeleted,
+}: DialogProps & { community: Schemas["CommunityResponse"]; onDeleted: () => void }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [typed, setTyped] = useState("");
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE("/communities/{communityId}", { params: { path: { communityId: community.id } } });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      onDeleted();
+      dropCommunity(queryClient, community.id);
+      onClose();
+    },
+  });
+  const confirmed = typed.trim().toLowerCase() === community.name.trim().toLowerCase();
+
+  return (
+    <Dialog title="Delete community" onClose={onClose}>
+      <form
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          if (confirmed) mutation.mutate();
+        }}
+      >
+        <p className="dialog-warning">
+          <strong>{community.name}</strong> will be deleted for everyone, with all its channels and messages. This
+          cannot be undone.
+        </p>
+        <label>
+          Type the community name to confirm
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={community.name}
+            autoFocus
+          />
+        </label>
+        <FormError error={mutation.error} />
+        <div className="dialog-actions">
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="danger" disabled={!confirmed || mutation.isPending}>
+            {mutation.isPending ? "Please wait…" : "Delete community"}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+export function LeaveCommunityDialog({
+  community,
+  onClose,
+  onLeft,
+}: DialogProps & { community: Schemas["CommunityResponse"]; onLeft: () => void }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.POST("/communities/{communityId}/leave", { params: { path: { communityId: community.id } } });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      onLeft();
+      dropCommunity(queryClient, community.id);
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog title="Leave community" onClose={onClose}>
+      <p>
+        Leave <strong>{community.name}</strong>? You can come back only with a new invitation.
+      </p>
+      <FormError error={mutation.error} />
       <div className="dialog-actions">
-        <button className="primary" onClick={onClose}>
-          Done
+        <button type="button" onClick={onClose} autoFocus>
+          Cancel
+        </button>
+        <button type="button" className="danger" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          {mutation.isPending ? "Please wait…" : "Leave community"}
         </button>
       </div>
     </Dialog>
@@ -176,11 +308,11 @@ export function InviteDialog({ onClose, communityId }: DialogProps & { community
         >
           <label>
             Number of uses
-            <select name="maxUses" defaultValue="1">
+            <Select name="maxUses" defaultValue="1">
               <option value="1">1 person</option>
               <option value="5">5 people</option>
               <option value="25">25 people</option>
-            </select>
+            </Select>
           </label>
           <FormError error={mutation.error} />
           <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Create code" />
@@ -219,18 +351,28 @@ export function CreateChannelDialog({
           });
         }}
       >
-        <fieldset className="segmented-field">
+        <fieldset className="choice-cards">
           <legend>Type</legend>
-          <label>
-            <input type="radio" name="type" value="text" defaultChecked={type === "text"} /> Text
+          <label className="choice-card">
+            <input type="radio" name="type" value="text" defaultChecked={type === "text"} />
+            <Hash size={20} aria-hidden="true" />
+            <span>
+              <strong>Text</strong>
+              <span>Messages and links</span>
+            </span>
           </label>
-          <label>
-            <input type="radio" name="type" value="voice" defaultChecked={type === "voice"} /> Voice
+          <label className="choice-card">
+            <input type="radio" name="type" value="voice" defaultChecked={type === "voice"} />
+            <Volume2 size={20} aria-hidden="true" />
+            <span>
+              <strong>Voice</strong>
+              <span>Talk together</span>
+            </span>
           </label>
         </fieldset>
         <label>
           Name
-          <input name="name" required maxLength={100} autoFocus />
+          <input name="name" required maxLength={100} autoComplete="off" spellCheck={false} autoFocus />
         </label>
         <FormError error={mutation.error} />
         <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Create" />
@@ -264,7 +406,7 @@ export function EditChannelDialog({ onClose, channel }: DialogProps & { channel:
       >
         <label>
           Name
-          <input name="name" required maxLength={100} defaultValue={channel.name} autoFocus />
+          <input name="name" required maxLength={100} defaultValue={channel.name} autoComplete="off" spellCheck={false} autoFocus />
         </label>
         {channel.type === "text" && (
           <label>
