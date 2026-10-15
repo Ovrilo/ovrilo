@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### Fixed
+- The connection badge no longer says "Unstable" on a fast connection. Latency counts as unstable from 50 ms and poor from 100 ms, and a single audio hiccup on your own computer no longer changes the rating.
+
 ## [0.6.0] - 2026-10-15
 
 Screen sharing, a voice room that looks like a call, and community management.

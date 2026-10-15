@@ -55,10 +55,26 @@ describe("summarize", () => {
     expect(summary.issues).toContain("robotic audio (network)");
   });
 
-  it("flags local playout gaps separately from the network", () => {
-    const summary = summarize(series(10, (_, i) => ({ playoutUnderruns: i >= 5 ? 1 : 0 })));
-    expect(summary.quality).toBe("fair");
-    expect(summary.issues).toEqual(["audio gaps (playout)"]);
+  it("rates latency good below 50 ms, unstable from 50 ms and poor from 100 ms", () => {
+    expect(summarize(series(10, () => ({ roundTripMs: 20 }))).quality).toBe("good");
+    expect(summarize(series(10, () => ({ roundTripMs: 49 }))).quality).toBe("good");
+    expect(summarize(series(10, () => ({ roundTripMs: 50 }))).quality).toBe("fair");
+    const poor = summarize(series(10, () => ({ roundTripMs: 120 })));
+    expect(poor.quality).toBe("poor");
+    expect(poor.issues).toEqual(["high latency (120 ms)"]);
+  });
+
+  it("lists an isolated local hiccup without calling the connection unstable", () => {
+    const summary = summarize(
+      series(10, (_, i) => ({ playoutUnderruns: i >= 5 ? 1 : 0, remoteFramesDropped: i >= 5 ? 2 : 0 })),
+    );
+    expect(summary.quality).toBe("good");
+    expect(summary.issues).toEqual(["audio gaps (playout)", "dropped audio frames"]);
+  });
+
+  it("rates repeated local playout gaps", () => {
+    expect(summarize(series(10, (_, i) => ({ playoutUnderruns: Math.floor(i / 2) }))).quality).toBe("fair");
+    expect(summarize(series(10, (_, i) => ({ playoutUnderruns: i * 2 }))).quality).toBe("poor");
   });
 
   it("ignores counter resets after rejoining", () => {

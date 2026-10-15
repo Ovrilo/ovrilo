@@ -17,6 +17,10 @@ export interface VoiceStats {
 
 export type Quality = "good" | "fair" | "poor" | "unknown";
 
+/** Round-trip time from which the connection counts as unstable, and as poor. */
+export const LATENCY_UNSTABLE_MS = 50;
+export const LATENCY_POOR_MS = 100;
+
 /** Recent connection health computed over a window of stats samples (oldest first, ~1 per second). */
 export interface QualitySummary {
   quality: Quality;
@@ -31,7 +35,7 @@ export interface QualitySummary {
   skippedMs: number;
   /** Frames dropped locally in the window (remote queue + microphone). */
   droppedFrames: number;
-  /** Human-readable reasons for a non-good rating. */
+  /** Human-readable problems seen in the window, including isolated ones that did not lower the rating. */
   issues: string[];
 }
 
@@ -63,23 +67,26 @@ export function summarize(samples: readonly VoiceStats[]): QualitySummary {
   const skippedMs = delta((s) => s.playoutSkippedMs);
   const droppedFrames = delta((s) => s.remoteFramesDropped) + delta((s) => s.microphoneFramesDropped);
 
+  // The badge rates the internet connection. Local audio hiccups (a CPU spike delaying playout)
+  // are listed too, but only change the rating when they keep happening.
   const issues: string[] = [];
-  let poor = false;
-  const flag = (condition: boolean, issue: string, severe = false) => {
+  let level: 0 | 1 | 2 = 0;
+  const flag = (condition: boolean, issue: string, severity: 0 | 1 | 2) => {
     if (!condition) return;
     issues.push(issue);
-    poor ||= severe;
+    level = Math.max(level, severity) as 0 | 1 | 2;
   };
-  flag(lossPercent >= 1, `${lossPercent.toFixed(1)}% packet loss`, lossPercent >= 5);
-  flag(concealedMsPerSecond >= 20, "robotic audio (network)", concealedMsPerSecond >= 100);
-  flag((last.roundTripMs ?? 0) >= 150, `high latency (${last.roundTripMs} ms)`, (last.roundTripMs ?? 0) >= 300);
-  flag((last.inboundJitterMs ?? 0) >= 30, `unstable network (${last.inboundJitterMs} ms jitter)`);
-  flag(underruns > 0, "audio gaps (playout)", underruns >= 5);
-  flag(skippedMs > 0, "audio skips (playout)");
-  flag(droppedFrames > 0, "dropped audio frames");
+  const rtt = last.roundTripMs ?? 0;
+  flag(lossPercent >= 1, `${lossPercent.toFixed(1)}% packet loss`, lossPercent >= 5 ? 2 : 1);
+  flag(concealedMsPerSecond >= 20, "robotic audio (network)", concealedMsPerSecond >= 100 ? 2 : 1);
+  flag(rtt >= LATENCY_UNSTABLE_MS, `high latency (${rtt} ms)`, rtt >= LATENCY_POOR_MS ? 2 : 1);
+  flag((last.inboundJitterMs ?? 0) >= 30, `unstable network (${last.inboundJitterMs} ms jitter)`, 1);
+  flag(underruns > 0, "audio gaps (playout)", underruns >= 10 ? 2 : underruns >= 3 ? 1 : 0);
+  flag(skippedMs > 0, "audio skips (playout)", skippedMs >= 200 ? 1 : 0);
+  flag(droppedFrames > 0, "dropped audio frames", droppedFrames >= 10 ? 1 : 0);
 
   return {
-    quality: samples.length < 2 ? "unknown" : poor ? "poor" : issues.length > 0 ? "fair" : "good",
+    quality: samples.length < 2 ? "unknown" : (["good", "fair", "poor"] as const)[level],
     roundTripMs: last.roundTripMs,
     jitterMs: last.inboundJitterMs,
     lossPercent,
