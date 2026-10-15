@@ -80,6 +80,9 @@ export interface VoiceSnapshot {
   /** The chosen noise suppression, and the one actually running (Enhanced can fall back). */
   noiseSuppression: NoiseSuppression;
   noiseSuppressionActive: NoiseSuppression;
+  /** Master microphone and speaker volume, percent (100 = unchanged, up to 200). */
+  inputVolume: number;
+  outputVolume: number;
   screenShare: ScreenShare | null;
   /** Participant whose screen-share sound the engine plays. */
   watchingScreen: string | null;
@@ -113,6 +116,8 @@ const initialSnapshot: VoiceSnapshot = {
   transmitting: true,
   noiseSuppression: "enhanced",
   noiseSuppressionActive: "standard",
+  inputVolume: 100,
+  outputVolume: 100,
   screenShare: null,
   watchingScreen: null,
 };
@@ -225,5 +230,7 @@ export const voice = {
     command("voice_set_participant_volume", { participantId: `${participantId}#screen`, percent: Math.round(percent) }),
   setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
   setNoiseSuppression: (mode: NoiseSuppression) => command("voice_set_noise_suppression", { mode }),
+  setInputVolume: (percent: number) => command("voice_set_input_volume", { percent: Math.round(percent) }),
+  setOutputVolume: (percent: number) => command("voice_set_output_volume", { percent: Math.round(percent) }),
   reportFailure,
 };

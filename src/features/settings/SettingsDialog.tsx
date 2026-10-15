@@ -1,4 +1,4 @@
-import { Keyboard, LogOut, RefreshCw } from "lucide-react";
+import { AudioLines, Headphones, Keyboard, LogOut, type LucideIcon, Mic, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
@@ -19,7 +19,7 @@ export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserRe
       <div className="settings">
         <nav className="settings-tabs" role="tablist" aria-label="Settings sections">
           <button role="tab" aria-selected={tab === "audio"} onClick={() => setTab("audio")}>
-            Audio
+            Voice & audio
           </button>
           <button role="tab" aria-selected={tab === "account"} onClick={() => setTab("account")}>
             Account
@@ -44,28 +44,112 @@ function AudioSettings() {
     return <p className="muted">Audio devices are available in the desktop app.</p>;
   }
   return (
-    <div className="settings-section">
-      <DeviceSelect
-        label="Microphone"
-        devices={snapshot.inputs}
-        value={snapshot.inputDeviceId}
-        onChange={(id) => void voice.setInputDevice(id)}
-      />
-      <DeviceSelect
-        label="Speaker / headphones"
-        devices={snapshot.outputs}
-        value={snapshot.outputDeviceId}
-        onChange={(id) => void voice.setOutputDevice(id)}
-      />
-      <button className="ghost with-icon" onClick={() => void voice.refreshDevices()}>
-        <RefreshCw size={14} aria-hidden="true" /> Refresh devices
-      </button>
+    <div className="settings-page">
+      <section className="settings-group" aria-labelledby="settings-devices">
+        <div className="settings-group-head">
+          <h3 id="settings-devices">Devices</h3>
+          <button className="ghost small-button with-icon" onClick={() => void voice.refreshDevices()}>
+            <RefreshCw size={13} aria-hidden="true" /> Refresh
+          </button>
+        </div>
+        <div className="device-grid">
+          <DevicePanel
+            icon={Mic}
+            title="Microphone"
+            devices={snapshot.inputs}
+            deviceId={snapshot.inputDeviceId}
+            onDevice={(id) => void voice.setInputDevice(id)}
+            volume={snapshot.inputVolume}
+            onVolume={(percent) => void voice.setInputVolume(percent)}
+            volumeLabel="Input volume"
+          />
+          <DevicePanel
+            icon={Headphones}
+            title="Speaker or headphones"
+            devices={snapshot.outputs}
+            deviceId={snapshot.outputDeviceId}
+            onDevice={(id) => void voice.setOutputDevice(id)}
+            volume={snapshot.outputVolume}
+            onVolume={(percent) => void voice.setOutputVolume(percent)}
+            volumeLabel="Output volume"
+          />
+        </div>
+      </section>
       <InputMode />
       <NoiseSuppressionSetting />
-      <p className="muted small">
-        Changes apply immediately, also during a call. Echo cancellation and automatic gain are always on.
+      <p className="muted small settings-footnote">
+        Changes apply right away, also during a call. Echo cancellation and automatic gain are always on.
       </p>
     </div>
+  );
+}
+
+function DevicePanel({
+  icon: Icon,
+  title,
+  devices,
+  deviceId,
+  onDevice,
+  volume,
+  onVolume,
+  volumeLabel,
+}: {
+  icon: LucideIcon;
+  title: string;
+  devices: VoiceDevice[];
+  deviceId: string | null;
+  onDevice: (id: string | null) => void;
+  volume: number;
+  onVolume: (percent: number) => void;
+  volumeLabel: string;
+}) {
+  const defaultName = devices.find((d) => d.isDefault)?.name;
+  return (
+    <div className="device-panel">
+      <div className="device-panel-title">
+        <Icon size={16} aria-hidden="true" />
+        <span>{title}</span>
+      </div>
+      <Select aria-label={title} value={deviceId ?? ""} onChange={(e) => onDevice(e.target.value || null)}>
+        <option value="">System default{defaultName ? ` (${defaultName})` : ""}</option>
+        {devices.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </Select>
+      <VolumeSlider label={volumeLabel} value={volume} onCommit={onVolume} />
+    </div>
+  );
+}
+
+/** 0–200 %; shows the value while dragging and applies it when released (saved once, not per step). */
+function VolumeSlider({ label, value, onCommit }: { label: string; value: number; onCommit: (percent: number) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const commit = () => {
+    if (draft !== value) onCommit(draft);
+  };
+  return (
+    <label className="volume-slider">
+      <span className="volume-slider-head">
+        <span>{label}</span>
+        <span className="volume-value">{draft}%</span>
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={200}
+        step={5}
+        value={draft}
+        aria-valuetext={`${draft} percent`}
+        style={{ "--fill": `${draft / 2}%` } as React.CSSProperties}
+        onChange={(e) => setDraft(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
+      />
+    </label>
   );
 }
 
@@ -80,28 +164,36 @@ function InputMode() {
   };
 
   return (
-    <fieldset className="input-mode">
+    <fieldset className="settings-group">
       <legend>Input mode</legend>
-      <label className="radio">
-        <input
-          type="radio"
-          name="input-mode"
-          checked={!snapshot.pushToTalk}
-          onChange={() => void voice.setPushToTalk(false, key)}
-        />
-        Voice activity <span className="muted small">— your microphone is open while unmuted</span>
-      </label>
-      <label className="radio">
-        <input
-          type="radio"
-          name="input-mode"
-          checked={snapshot.pushToTalk}
-          onChange={() => (key ? void voice.setPushToTalk(true, key) : setBinding(true))}
-        />
-        Push to talk <span className="muted small">— hold a key to talk, also while a game has focus</span>
-      </label>
+      <div className="choice-grid">
+        <label className={`choice${!snapshot.pushToTalk ? " selected" : ""}`}>
+          <input
+            type="radio"
+            name="input-mode"
+            className="visually-hidden"
+            checked={!snapshot.pushToTalk}
+            onChange={() => void voice.setPushToTalk(false, key)}
+          />
+          <AudioLines size={18} aria-hidden="true" />
+          <strong>Voice activity</strong>
+          <span className="muted small">Your microphone is open while you are unmuted.</span>
+        </label>
+        <label className={`choice${snapshot.pushToTalk ? " selected" : ""}`}>
+          <input
+            type="radio"
+            name="input-mode"
+            className="visually-hidden"
+            checked={snapshot.pushToTalk}
+            onChange={() => (key ? void voice.setPushToTalk(true, key) : setBinding(true))}
+          />
+          <Keyboard size={18} aria-hidden="true" />
+          <strong>Push to talk</strong>
+          <span className="muted small">Hold a key to talk, also while a game has focus.</span>
+        </label>
+      </div>
       <div className="ptt-key">
-        <span className="muted small">Push-to-talk key</span>
+        <span>Push-to-talk key</span>
         {binding ? (
           <KeyCapture onKey={choose} onCancel={() => setBinding(false)} />
         ) : (
@@ -112,8 +204,8 @@ function InputMode() {
         )}
       </div>
       <p className="muted small">
-        The key still reaches your game. Mouse side buttons work too. Games running as administrator may need Ovrilo
-        to run as administrator as well.
+        The key still reaches your game, and mouse side buttons work too. Games running as administrator may need
+        Ovrilo to run as administrator as well.
       </p>
     </fieldset>
   );
@@ -123,31 +215,36 @@ const NOISE_OPTIONS: { value: NoiseSuppression; label: string; hint: string }[] 
   {
     value: "enhanced",
     label: "Enhanced",
-    hint: "removes keyboard and mouse clicks and room noise, and stays silent between words",
+    hint: "Removes keyboard and mouse clicks and room noise, and keeps your microphone silent between words.",
   },
-  { value: "standard", label: "Standard", hint: "reduces steady noise such as fans and hum" },
-  { value: "off", label: "Off", hint: "sends your microphone as it is" },
+  { value: "standard", label: "Standard", hint: "Reduces steady noise such as fans and hum. Clicks still come through." },
+  { value: "off", label: "Off", hint: "Sends your microphone as it is." },
 ];
 
 function NoiseSuppressionSetting() {
   const { snapshot } = useVoice();
   const chosen = snapshot.noiseSuppression;
   const fellBack = chosen === "enhanced" && snapshot.noiseSuppressionActive !== "enhanced";
+  const hint = NOISE_OPTIONS.find((o) => o.value === chosen)?.hint;
 
   return (
-    <fieldset className="input-mode">
+    <fieldset className="settings-group">
       <legend>Noise suppression</legend>
-      {NOISE_OPTIONS.map((option) => (
-        <label className="radio" key={option.value}>
-          <input
-            type="radio"
-            name="noise-suppression"
-            checked={chosen === option.value}
-            onChange={() => void voice.setNoiseSuppression(option.value)}
-          />
-          {option.label} <span className="muted small">— {option.hint}</span>
-        </label>
-      ))}
+      <div className="segmented" role="radiogroup" aria-label="Noise suppression">
+        {NOISE_OPTIONS.map((option) => (
+          <label key={option.value} className={chosen === option.value ? "selected" : undefined}>
+            <input
+              type="radio"
+              name="noise-suppression"
+              className="visually-hidden"
+              checked={chosen === option.value}
+              onChange={() => void voice.setNoiseSuppression(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      <p className="muted small">{hint}</p>
       {fellBack && (
         <p className="form-error small" role="status">
           Enhanced is not running: this computer could not keep up, so Standard is used. Choose Enhanced again to retry.
@@ -233,32 +330,5 @@ function AccountSettings({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <LogOut size={16} aria-hidden="true" /> Sign out
       </button>
     </div>
-  );
-}
-
-function DeviceSelect({
-  label,
-  devices,
-  value,
-  onChange,
-}: {
-  label: string;
-  devices: VoiceDevice[];
-  value: string | null;
-  onChange: (id: string | null) => void;
-}) {
-  const defaultName = devices.find((d) => d.isDefault)?.name;
-  return (
-    <label>
-      {label}
-      <Select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">System default{defaultName ? ` (${defaultName})` : ""}</option>
-        {devices.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </Select>
-    </label>
   );
 }

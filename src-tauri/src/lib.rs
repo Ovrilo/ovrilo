@@ -45,6 +45,8 @@ pub fn run() {
             voice::voice_stats_log_path,
             voice::voice_set_push_to_talk,
             voice::voice_set_noise_suppression,
+            voice::voice_set_input_volume,
+            voice::voice_set_output_volume,
             voice::voice_set_participant_volume,
             voice::voice_set_participant_muted,
             voice::voice_list_screen_sources,
