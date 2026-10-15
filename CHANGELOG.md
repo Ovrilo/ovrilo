@@ -10,7 +10,11 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 - Owners can delete a community. It disappears for everyone right away; typing its name confirms the deletion.
 - Members can leave a community.
 - Screen sharing (preview, available when your server turns it on): in a voice channel, share a window or your whole screen in 720p or 1080p. A shared window can bring its application's sound along, and your voice chat is never included.
-- People who are sharing show a LIVE badge in the channel list and the voice room; click Watch to see their screen, full screen if you like. Their sound plays while you watch.
+- Choose what your share is for: "Sharp text" keeps code and documents crisp with the least data, "Smooth motion" keeps games and video fluid.
+- The voice room looks like a call: everyone and every stream as a tile, a green ring around whoever talks, and round buttons for mute, deafen, share and leave.
+- Streams have their own tiles. Click one to watch it large with the others below; double-click (or the button) for full screen. While you share, you can preview your own stream.
+- The player shows resolution, frame rate, data rate and codec, and has its own volume for the stream's sound. Its controls fade when you stop moving the mouse.
+- People who are sharing show a LIVE badge in the channel list and the voice room. In a browser you can still watch streams.
 
 ### Changed
 - Forms match the dark theme: topic and description boxes, dropdowns and the channel type picker.

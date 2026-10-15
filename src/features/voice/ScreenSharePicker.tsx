@@ -1,21 +1,27 @@
-import { AppWindow, Monitor, RefreshCw } from "lucide-react";
+import { AppWindow, Gauge, Monitor, RefreshCw, Type } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Dialog } from "../../components/Dialog";
 import { IconButton, Select } from "../../components/ui";
-import { type SharePreset, useVoice, voice } from "./voice";
+import { type ShareOptimization, type SharePreset, useVoice, voice } from "./voice";
 
 const PRESETS: { value: SharePreset; label: string }[] = [
-  { value: "720p30", label: "720p, 30 fps (recommended)" },
-  { value: "1080p30", label: "1080p, 30 fps" },
-  { value: "1080p60", label: "1080p, 60 fps (more data for everyone)" },
+  { value: "1080p30", label: "1080p, 30 fps (recommended)" },
+  { value: "1080p60", label: "1080p, 60 fps (more data and CPU)" },
+  { value: "720p30", label: "720p, 30 fps (data saver)" },
+];
+
+const OPTIMIZATIONS: { value: ShareOptimization; label: string; hint: string; icon: typeof Type }[] = [
+  { value: "detail", label: "Sharp text", hint: "Code, documents, apps. Least data.", icon: Type },
+  { value: "motion", label: "Smooth motion", hint: "Games and video. Keeps the frame rate.", icon: Gauge },
 ];
 
 /** Pick a window or screen to share (ADR-0017). Windows can also share their application's sound. */
 export function ScreenSharePicker({ onClose }: { onClose: () => void }) {
   const { screenSources, snapshot } = useVoice();
   const [selected, setSelected] = useState<string | null>(snapshot.screenShare?.sourceId ?? null);
-  const [preset, setPreset] = useState<SharePreset>(snapshot.screenShare?.preset ?? "720p30");
+  const [preset, setPreset] = useState<SharePreset>(snapshot.screenShare?.preset ?? "1080p30");
+  const [optimization, setOptimization] = useState<ShareOptimization>(snapshot.screenShare?.optimization ?? "detail");
   const [withSound, setWithSound] = useState(true);
 
   useEffect(() => {
@@ -29,7 +35,7 @@ export function ScreenSharePicker({ onClose }: { onClose: () => void }) {
 
   const start = () => {
     if (!source) return;
-    void voice.startScreenShare(source.id, preset, soundPossible && withSound);
+    void voice.startScreenShare(source.id, preset, optimization, soundPossible && withSound);
     onClose();
   };
 
@@ -57,6 +63,23 @@ export function ScreenSharePicker({ onClose }: { onClose: () => void }) {
         </div>
       )}
       <div className="share-options">
+        <div className="share-optimization" role="radiogroup" aria-label="Optimize for">
+          {OPTIMIZATIONS.map((o) => (
+            <label key={o.value} className="share-optimization-option">
+              <input
+                type="radio"
+                name="optimization"
+                checked={optimization === o.value}
+                onChange={() => setOptimization(o.value)}
+              />
+              <o.icon size={18} aria-hidden="true" />
+              <span>
+                <strong>{o.label}</strong>
+                <span>{o.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
         <label>
           Quality
           <Select value={preset} onChange={(e) => setPreset(e.target.value as SharePreset)}>

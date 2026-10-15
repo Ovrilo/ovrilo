@@ -20,9 +20,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3.6.3", features = ["windows-native"] }
 # Pinned Git revision (ADR-0001). Private repo: fetched with the git CLI (see .cargo/config.toml).
-ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "ba510f87a0c62a88899fc63e9772bb302b68622c" }
-ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "ba510f87a0c62a88899fc63e9772bb302b68622c" }
-ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "ba510f87a0c62a88899fc63e9772bb302b68622c" }
+ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1ffef353e02f6744a49ed9ec8cc64d77e7093f66" }
+ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1ffef353e02f6744a49ed9ec8cc64d77e7093f66" }
+ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1ffef353e02f6744a49ed9ec8cc64d77e7093f66" }
 tauri-plugin-updater = "=2.13.1"
 tauri-plugin-process = "=2.4.0"
 

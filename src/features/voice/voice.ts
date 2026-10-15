@@ -28,15 +28,20 @@ export interface VoiceParticipant {
   /** They are sharing their screen; `screenAudio`: with application sound (ADR-0017). */
   screenSharing: boolean;
   screenAudio: boolean;
+  /** Local playback volume of their screen-share sound, percent (0–200). */
+  screenVolume: number;
 }
 
 export type SharePreset = "720p30" | "1080p30" | "1080p60";
+/** What a share keeps under pressure: sharp text ("detail") or smooth movement ("motion"). */
+export type ShareOptimization = "detail" | "motion";
 
 /** The local screen share while it runs. */
 export interface ScreenShare {
   sourceId: string;
   title: string;
   preset: SharePreset;
+  optimization: ShareOptimization;
   /** The application's sound is shared too. */
   audio: boolean;
 }
@@ -190,9 +195,9 @@ export const voice = {
     setState({ screenSources: null });
     return command("voice_list_screen_sources");
   },
-  startScreenShare: (sourceId: string, preset: SharePreset, audio: boolean) => {
+  startScreenShare: (sourceId: string, preset: SharePreset, optimization: ShareOptimization, audio: boolean) => {
     setState({ lastError: null });
-    return command("voice_start_screen_share", { sourceId, preset, audio });
+    return command("voice_start_screen_share", { sourceId, preset, optimization, audio });
   },
   stopScreenShare: () => command("voice_stop_screen_share"),
   /** Plays the watched share's sound in the engine (`null` stops); video plays in the webview. */
@@ -207,6 +212,9 @@ export const voice = {
     command("voice_set_participant_volume", { participantId, percent: Math.round(percent) }),
   setParticipantMuted: (participantId: string, muted: boolean) =>
     command("voice_set_participant_muted", { participantId, muted }),
+  /** Volume of a participant's screen-share sound (the engine's `{id}#screen` stream), 0–200 %. */
+  setScreenVolume: (participantId: string, percent: number) =>
+    command("voice_set_participant_volume", { participantId: `${participantId}#screen`, percent: Math.round(percent) }),
   setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
   reportFailure,
 };
