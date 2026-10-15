@@ -20,9 +20,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3.6.3", features = ["windows-native"] }
 # Pinned Git revision (ADR-0001). Private repo: fetched with the git CLI (see .cargo/config.toml).
-ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
-ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
-ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
+ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1f5914f19a34beefa91194a6f9f4c9e79c707a0e" }
+ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1f5914f19a34beefa91194a6f9f4c9e79c707a0e" }
+ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "1f5914f19a34beefa91194a6f9f4c9e79c707a0e" }
 tauri-plugin-updater = "=2.13.1"
 tauri-plugin-process = "=2.4.0"
 
@@ -30,6 +30,30 @@ tauri-plugin-process = "=2.4.0"
 # dependencies in dev builds while the app crate itself stays fast to rebuild.
 [profile.dev.package."*"]
 opt-level = 3
+
+# The engine's noise-suppression model runtime: tract's debug assertions reject the
+# DeepFilterNet3 graph that release builds run fine, so they are off for it in development
+# (ovrilo-voice ADR-0018). Without this, Enhanced falls back to Standard in dev builds.
+[profile.dev.package.tract-core]
+debug-assertions = false
+[profile.dev.package.tract-data]
+debug-assertions = false
+[profile.dev.package.tract-linalg]
+debug-assertions = false
+[profile.dev.package.tract-hir]
+debug-assertions = false
+[profile.dev.package.tract-onnx]
+debug-assertions = false
+[profile.dev.package.tract-onnx-opl]
+debug-assertions = false
+[profile.dev.package.tract-nnef]
+debug-assertions = false
+[profile.dev.package.tract-pulse]
+debug-assertions = false
+[profile.dev.package.tract-pulse-opl]
+debug-assertions = false
+[profile.dev.package.deep_filter]
+debug-assertions = false
 
 # https://tauri.app/concept/size/#cargo-configuration
 # Thin LTO with default codegen units: most of fat LTO's size and speed benefit at a fraction of the
