@@ -2,13 +2,15 @@
 //!
 //! The engine is authoritative. The host folds engine events into a [`VoiceSnapshot`] and emits it
 //! as `voice://state-changed`; errors are emitted as `voice://error` and diagnostics (about 1 Hz
-//! while in a room) as `voice://stats`, also appended to a CSV log. Audio never crosses IPC.
+//! while in a room) as `voice://stats`, also appended to a CSV log. Shareable screens and windows
+//! are emitted as `voice://screen-sources`. Audio and video never cross IPC.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ovrilo_voice::{
-    AudioDevice, ConnectionState, DeviceId, ParticipantId, VoiceCommand, VoiceEngine,
+    AudioDevice, ConnectionState, DeviceId, ParticipantId, ScreenShare, ScreenSource,
+    ScreenSourceId, ScreenSourceKind, ShareOptimization, SharePreset, VoiceCommand, VoiceEngine,
     VoiceEngineHandle, VoiceErrorCode, VoiceEvent, VoiceStats,
 };
 use ovrilo_voice_cpal::CpalBackend;
@@ -24,10 +26,14 @@ use crate::stats_log::StatsLog;
 pub const STATE_CHANGED: &str = "voice://state-changed";
 pub const ERROR: &str = "voice://error";
 pub const STATS: &str = "voice://stats";
+pub const SCREEN_SOURCES: &str = "voice://screen-sources";
 
 /// Bounds for values the UI passes through to the engine.
 const MAX_TOKEN_LENGTH: usize = 4096;
 const MAX_ID_LENGTH: usize = 512;
+/// Volume preferences for a participant's screen-share sound use `{participant id}#screen`, the
+/// engine's key for that stream.
+const SCREEN_VOLUME_SUFFIX: &str = "#screen";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +63,10 @@ pub struct VoiceSnapshot {
     push_to_talk_key: Option<PushToTalkKey>,
     /// Microphone audio is allowed out right now (see `TransmittingChanged`).
     transmitting: bool,
+    /// The local screen share while it runs (ADR-0017).
+    screen_share: Option<ScreenShareDto>,
+    /// Participant whose screen-share sound the engine plays (the share the user watches).
+    watching_screen: Option<String>,
     /// Per-user preferences (host-owned, persisted): volume and local mute. The engine gets the
     /// effective volume (0 while locally muted).
     #[serde(skip)]
@@ -78,6 +88,109 @@ pub struct ParticipantDto {
     locally_muted: bool,
     /// The participant muted their own microphone.
     muted: bool,
+    /// They are sharing their screen; `screen_audio`: with application sound.
+    screen_sharing: bool,
+    screen_audio: bool,
+    /// Local playback volume of their screen-share sound, percent (0 while locally muted).
+    screen_volume: u16,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenShareDto {
+    source_id: String,
+    title: String,
+    /// `720p30` | `1080p30` | `1080p60`
+    preset: &'static str,
+    /// `detail` | `motion`
+    optimization: &'static str,
+    /// The application's sound is shared too.
+    audio: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenSourceDto {
+    id: String,
+    /// `screen` | `window`
+    kind: &'static str,
+    title: String,
+    application: Option<String>,
+    audio_available: bool,
+}
+
+fn preset_name(preset: SharePreset) -> &'static str {
+    match preset {
+        SharePreset::FullHd1080p30 => "1080p30",
+        SharePreset::FullHd1080p60 => "1080p60",
+        _ => "720p30",
+    }
+}
+
+fn parse_preset(name: &str) -> Result<SharePreset, CommandError> {
+    match name {
+        "720p30" => Ok(SharePreset::Hd720p30),
+        "1080p30" => Ok(SharePreset::FullHd1080p30),
+        "1080p60" => Ok(SharePreset::FullHd1080p60),
+        _ => Err(CommandError::new(
+            "voice.invalid_argument",
+            "preset must be 720p30, 1080p30 or 1080p60",
+        )),
+    }
+}
+
+fn optimization_name(optimization: ShareOptimization) -> &'static str {
+    match optimization {
+        ShareOptimization::Motion => "motion",
+        _ => "detail",
+    }
+}
+
+fn parse_optimization(name: &str) -> Result<ShareOptimization, CommandError> {
+    match name {
+        "detail" => Ok(ShareOptimization::Detail),
+        "motion" => Ok(ShareOptimization::Motion),
+        _ => Err(CommandError::new(
+            "voice.invalid_argument",
+            "optimization must be detail or motion",
+        )),
+    }
+}
+
+/// Effective volume of a preference key: 0 while locally muted.
+fn effective_volume(state: &VoiceSnapshot, id: &str) -> u16 {
+    if state.locally_muted.contains(id) {
+        0
+    } else {
+        state.volumes.get(id).copied().unwrap_or(100)
+    }
+}
+
+impl From<ScreenShare> for ScreenShareDto {
+    fn from(share: ScreenShare) -> Self {
+        Self {
+            source_id: share.source.0,
+            title: share.title,
+            preset: preset_name(share.preset),
+            optimization: optimization_name(share.optimization),
+            audio: share.audio,
+        }
+    }
+}
+
+impl From<ScreenSource> for ScreenSourceDto {
+    fn from(source: ScreenSource) -> Self {
+        Self {
+            id: source.id.0,
+            kind: match source.kind {
+                ScreenSourceKind::Screen => "screen",
+                _ => "window",
+            },
+            title: source.title,
+            application: source.application,
+            audio_available: source.audio_available,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -151,6 +264,8 @@ impl Default for VoiceSnapshot {
             push_to_talk: false,
             push_to_talk_key: None,
             transmitting: true,
+            screen_share: None,
+            watching_screen: None,
             volumes: BTreeMap::new(),
             locally_muted: BTreeSet::new(),
         }
@@ -205,6 +320,12 @@ impl VoiceHost {
                         log.write(channel.as_deref(), &dto);
                     }
                     let _ = app.emit(STATS, dto);
+                    continue;
+                }
+                if let VoiceEvent::ScreenSourcesListed(sources) = event {
+                    let sources: Vec<ScreenSourceDto> =
+                        sources.into_iter().map(ScreenSourceDto::from).collect();
+                    let _ = app.emit(SCREEN_SOURCES, sources);
                     continue;
                 }
                 if let VoiceEvent::Error { code, message } = &event {
@@ -330,6 +451,8 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
                 state.participants.clear();
                 state.microphone_active = false;
                 state.self_speaking = false;
+                state.screen_share = None;
+                state.watching_screen = None;
             }
         }
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
@@ -344,6 +467,7 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
             state.participants.retain(|p| p.id != id.0);
             let volume = state.volumes.get(&id.0).copied().unwrap_or(100);
             let locally_muted = state.locally_muted.contains(&id.0);
+            let screen_volume = effective_volume(state, &format!("{}{SCREEN_VOLUME_SUFFIX}", id.0));
             state.participants.push(ParticipantDto {
                 id: id.0,
                 name,
@@ -351,9 +475,42 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
                 volume,
                 locally_muted,
                 muted: false,
+                screen_sharing: false,
+                screen_audio: false,
+                screen_volume,
             });
         }
-        VoiceEvent::ParticipantLeft { id } => state.participants.retain(|p| p.id != id.0),
+        VoiceEvent::ParticipantLeft { id } => {
+            state.participants.retain(|p| p.id != id.0);
+            if state.watching_screen.as_deref() == Some(id.0.as_str()) {
+                state.watching_screen = None;
+            }
+        }
+        VoiceEvent::ScreenShareChanged(share) => {
+            let share = share.map(ScreenShareDto::from);
+            if state.screen_share == share {
+                return false;
+            }
+            state.screen_share = share;
+        }
+        VoiceEvent::ParticipantScreenShareChanged {
+            participant,
+            sharing,
+            audio,
+        } => match state
+            .participants
+            .iter_mut()
+            .find(|p| p.id == participant.0)
+        {
+            Some(p) if (p.screen_sharing, p.screen_audio) != (sharing, audio) => {
+                p.screen_sharing = sharing;
+                p.screen_audio = audio;
+                if !sharing && state.watching_screen.as_deref() == Some(participant.0.as_str()) {
+                    state.watching_screen = None;
+                }
+            }
+            _ => return false,
+        },
         VoiceEvent::ParticipantMutedChanged { participant, muted } => {
             match state
                 .participants
@@ -404,6 +561,7 @@ fn error_code(code: VoiceErrorCode) -> &'static str {
         VoiceErrorCode::PermissionDenied => "voice.permission_denied",
         VoiceErrorCode::DeviceUnavailable => "voice.device_unavailable",
         VoiceErrorCode::TransportUnavailable => "voice.transport_unavailable",
+        VoiceErrorCode::CaptureUnavailable => "voice.capture_unavailable",
         _ => "voice.internal",
     }
 }
@@ -592,7 +750,12 @@ fn set_participant_preference(
     }
     let volume = state.volumes.get(id).copied().unwrap_or(100);
     let locally_muted = state.locally_muted.contains(id);
-    if let Some(p) = state.participants.iter_mut().find(|p| p.id == id) {
+    if let Some(owner) = id.strip_suffix(SCREEN_VOLUME_SUFFIX) {
+        let screen_volume = effective_volume(state, id);
+        if let Some(p) = state.participants.iter_mut().find(|p| p.id == owner) {
+            p.screen_volume = screen_volume;
+        }
+    } else if let Some(p) = state.participants.iter_mut().find(|p| p.id == id) {
         p.volume = volume;
         p.locally_muted = locally_muted;
     }
@@ -604,14 +767,10 @@ fn apply_participant_preference(
     host: &State<'_, VoiceHost>,
     participant_id: String,
 ) -> Result<(), CommandError> {
-    let percent = {
-        let state = host.snapshot.lock().unwrap_or_else(PoisonError::into_inner);
-        if state.locally_muted.contains(&participant_id) {
-            0
-        } else {
-            state.volumes.get(&participant_id).copied().unwrap_or(100)
-        }
-    };
+    let percent = effective_volume(
+        &host.snapshot.lock().unwrap_or_else(PoisonError::into_inner),
+        &participant_id,
+    );
     host.send(VoiceCommand::SetParticipantVolume {
         participant: ParticipantId(participant_id),
         percent,
@@ -659,6 +818,72 @@ pub fn voice_set_push_to_talk(
 #[tauri::command]
 pub fn voice_refresh_devices(host: State<'_, VoiceHost>) -> Result<(), CommandError> {
     host.send(VoiceCommand::RefreshDevices)
+}
+
+/// Lists shareable screens and windows; the list arrives as `voice://screen-sources`.
+#[tauri::command]
+pub fn voice_list_screen_sources(host: State<'_, VoiceHost>) -> Result<(), CommandError> {
+    host.send(VoiceCommand::ListScreenSources)
+}
+
+/// Shares a screen or window in the current room (ADR-0017). The engine confirms with the
+/// snapshot's `screenShare`, or reports `voice.capture_unavailable`.
+#[tauri::command]
+pub fn voice_start_screen_share(
+    host: State<'_, VoiceHost>,
+    source_id: String,
+    preset: String,
+    optimization: String,
+    audio: bool,
+) -> Result<(), CommandError> {
+    check_length(&source_id, MAX_ID_LENGTH, "source id")?;
+    host.send(VoiceCommand::StartScreenShare {
+        source: ScreenSourceId(source_id),
+        preset: parse_preset(&preset)?,
+        optimization: parse_optimization(&optimization)?,
+        audio,
+    })
+}
+
+#[tauri::command]
+pub fn voice_stop_screen_share(host: State<'_, VoiceHost>) -> Result<(), CommandError> {
+    host.send(VoiceCommand::StopScreenShare)
+}
+
+/// Plays the sound of the share the user watches (`None` stops). Video is watched in the webview.
+#[tauri::command]
+pub fn voice_watch_screen_share(
+    app: AppHandle,
+    host: State<'_, VoiceHost>,
+    participant_id: Option<String>,
+) -> Result<(), CommandError> {
+    if let Some(id) = &participant_id {
+        check_length(id, MAX_ID_LENGTH, "participant id")?;
+    }
+    let previous = host
+        .snapshot
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .watching_screen
+        .clone();
+    if previous == participant_id {
+        return Ok(());
+    }
+    if let Some(previous) = previous {
+        host.send(VoiceCommand::WatchScreenShare {
+            participant: ParticipantId(previous),
+            watching: false,
+        })?;
+    }
+    if let Some(id) = &participant_id {
+        host.send(VoiceCommand::WatchScreenShare {
+            participant: ParticipantId(id.clone()),
+            watching: true,
+        })?;
+    }
+    host.update(|s| s.watching_screen = participant_id);
+    let _ = app.emit(STATE_CHANGED, voice_get_state(host));
+    Ok(())
 }
 
 #[cfg(test)]
@@ -830,5 +1055,101 @@ mod volume_tests {
         );
         assert!(!changed);
         assert_eq!(state.participants[0].volume, 150);
+    }
+
+    #[test]
+    fn screen_shares_are_tracked_and_cleared() {
+        let mut state = VoiceSnapshot::default();
+        let ada = ParticipantId("u1".into());
+        apply(
+            &mut state,
+            VoiceEvent::ConnectionStateChanged(ConnectionState::Connected),
+        );
+        apply(
+            &mut state,
+            VoiceEvent::ParticipantJoined {
+                id: ada.clone(),
+                name: "Ada".into(),
+            },
+        );
+        assert!(apply(
+            &mut state,
+            VoiceEvent::ParticipantScreenShareChanged {
+                participant: ada.clone(),
+                sharing: true,
+                audio: true,
+            },
+        ));
+        assert!((state.participants[0].screen_sharing && state.participants[0].screen_audio));
+        state.watching_screen = Some("u1".into());
+
+        assert!(apply(
+            &mut state,
+            VoiceEvent::ScreenShareChanged(Some(ScreenShare {
+                source: ScreenSourceId("window:1".into()),
+                title: "Game".into(),
+                preset: SharePreset::FullHd1080p30,
+                optimization: ShareOptimization::Motion,
+                audio: false,
+            })),
+        ));
+        assert_eq!(
+            state
+                .screen_share
+                .as_ref()
+                .map(|s| (s.preset, s.optimization, s.audio)),
+            Some(("1080p30", "motion", false))
+        );
+
+        // Their share ending stops watching it; leaving the room clears ours.
+        apply(
+            &mut state,
+            VoiceEvent::ParticipantScreenShareChanged {
+                participant: ada,
+                sharing: false,
+                audio: false,
+            },
+        );
+        assert_eq!(state.watching_screen, None);
+        apply(
+            &mut state,
+            VoiceEvent::ConnectionStateChanged(ConnectionState::Disconnected),
+        );
+        assert_eq!(state.screen_share, None);
+    }
+
+    #[test]
+    fn presets_round_trip() {
+        for name in ["720p30", "1080p30", "1080p60"] {
+            assert_eq!(preset_name(parse_preset(name).unwrap()), name);
+        }
+        assert!(parse_preset("4k").is_err());
+        for name in ["detail", "motion"] {
+            assert_eq!(optimization_name(parse_optimization(name).unwrap()), name);
+        }
+        assert!(parse_optimization("fast").is_err());
+    }
+
+    #[test]
+    fn screen_volume_is_kept_apart_from_the_voice_volume() {
+        let mut state = VoiceSnapshot::default();
+        apply(
+            &mut state,
+            VoiceEvent::ParticipantJoined {
+                id: ParticipantId("u1".into()),
+                name: "Ada".into(),
+            },
+        );
+        set_participant_preference(&mut state, "u1#screen", Some(40), None);
+        assert_eq!(
+            (
+                state.participants[0].volume,
+                state.participants[0].screen_volume
+            ),
+            (100, 40)
+        );
+        set_participant_preference(&mut state, "u1#screen", None, Some(true));
+        assert_eq!(state.participants[0].screen_volume, 0);
+        assert!(!state.participants[0].locally_muted);
     }
 }

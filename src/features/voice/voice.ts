@@ -25,6 +25,34 @@ export interface VoiceParticipant {
   locallyMuted: boolean;
   /** The participant muted their own microphone. */
   muted: boolean;
+  /** They are sharing their screen; `screenAudio`: with application sound (ADR-0017). */
+  screenSharing: boolean;
+  screenAudio: boolean;
+  /** Local playback volume of their screen-share sound, percent (0–200). */
+  screenVolume: number;
+}
+
+export type SharePreset = "720p30" | "1080p30" | "1080p60";
+/** What a share keeps under pressure: sharp text ("detail") or smooth movement ("motion"). */
+export type ShareOptimization = "detail" | "motion";
+
+/** The local screen share while it runs. */
+export interface ScreenShare {
+  sourceId: string;
+  title: string;
+  preset: SharePreset;
+  optimization: ShareOptimization;
+  /** The application's sound is shared too. */
+  audio: boolean;
+}
+
+/** A screen or window that can be shared (`voice://screen-sources`). */
+export interface ScreenSource {
+  id: string;
+  kind: "screen" | "window";
+  title: string;
+  application: string | null;
+  audioAvailable: boolean;
 }
 
 export interface VoiceSnapshot {
@@ -46,6 +74,9 @@ export interface VoiceSnapshot {
   pushToTalkKey: PushToTalkKey | null;
   /** Microphone audio is allowed out right now (not muted/deafened; PTT key held in PTT mode). */
   transmitting: boolean;
+  screenShare: ScreenShare | null;
+  /** Participant whose screen-share sound the engine plays. */
+  watchingScreen: string | null;
 }
 
 export interface VoiceError {
@@ -74,6 +105,8 @@ const initialSnapshot: VoiceSnapshot = {
   pushToTalk: false,
   pushToTalkKey: null,
   transmitting: true,
+  screenShare: null,
+  watchingScreen: null,
 };
 
 interface VoiceStoreState {
@@ -82,9 +115,20 @@ interface VoiceStoreState {
   /** Recent diagnostics for the current room, oldest first. */
   stats: readonly VoiceStats[];
   statsLogPath: string | null;
+  /** Latest list from `voice.listScreenSources()`; null until it arrives. */
+  screenSources: readonly ScreenSource[] | null;
+  /** The API allowed screen sharing in the room we joined (join grant `canShareScreen`). */
+  canShareScreen: boolean;
 }
 
-let state: VoiceStoreState = { snapshot: initialSnapshot, lastError: null, stats: [], statsLogPath: null };
+let state: VoiceStoreState = {
+  snapshot: initialSnapshot,
+  lastError: null,
+  stats: [],
+  statsLogPath: null,
+  screenSources: null,
+  canShareScreen: false,
+};
 const listeners = new Set<() => void>();
 let started = false;
 
@@ -104,6 +148,7 @@ function start() {
   started = true;
   void listen<VoiceSnapshot>("voice://state-changed", (event) => onSnapshot(event.payload));
   void listen<VoiceError>("voice://error", (event) => setState({ lastError: event.payload }));
+  void listen<ScreenSource[]>("voice://screen-sources", (event) => setState({ screenSources: event.payload }));
   void listen<VoiceStats>("voice://stats", (event) =>
     setState({ stats: [...state.stats, event.payload].slice(-STATS_WINDOW) }),
   );
@@ -142,10 +187,21 @@ function command(name: string, args?: Record<string, unknown>): Promise<void> {
 }
 
 export const voice = {
-  join: (channelId: string, serverUrl: string, token: string) => {
-    setState({ lastError: null });
+  join: (channelId: string, serverUrl: string, token: string, canShareScreen = false) => {
+    setState({ lastError: null, canShareScreen });
     return command("voice_join", { channelId, serverUrl, token });
   },
+  listScreenSources: () => {
+    setState({ screenSources: null });
+    return command("voice_list_screen_sources");
+  },
+  startScreenShare: (sourceId: string, preset: SharePreset, optimization: ShareOptimization, audio: boolean) => {
+    setState({ lastError: null });
+    return command("voice_start_screen_share", { sourceId, preset, optimization, audio });
+  },
+  stopScreenShare: () => command("voice_stop_screen_share"),
+  /** Plays the watched share's sound in the engine (`null` stops); video plays in the webview. */
+  watchScreenShare: (participantId: string | null) => command("voice_watch_screen_share", { participantId }),
   leave: () => command("voice_leave"),
   setMuted: (muted: boolean) => command("voice_set_muted", { muted }),
   setDeafened: (deafened: boolean) => command("voice_set_deafened", { deafened }),
@@ -156,6 +212,9 @@ export const voice = {
     command("voice_set_participant_volume", { participantId, percent: Math.round(percent) }),
   setParticipantMuted: (participantId: string, muted: boolean) =>
     command("voice_set_participant_muted", { participantId, muted }),
+  /** Volume of a participant's screen-share sound (the engine's `{id}#screen` stream), 0–200 %. */
+  setScreenVolume: (participantId: string, percent: number) =>
+    command("voice_set_participant_volume", { participantId: `${participantId}#screen`, percent: Math.round(percent) }),
   setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
   reportFailure,
 };

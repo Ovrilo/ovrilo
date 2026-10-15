@@ -1,6 +1,6 @@
 [package]
 name = "ovrilo"
-version = "0.5.0"
+version = "0.6.0"
 description = "Ovrilo desktop client"
 authors = ["Ovrilo"]
 edition = "2024"
@@ -20,9 +20,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3.6.3", features = ["windows-native"] }
 # Pinned Git revision (ADR-0001). Private repo: fetched with the git CLI (see .cargo/config.toml).
-ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
-ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
-ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "39c04e063e79cb54f873e066a748e81ffdca4d6d" }
+ovrilo-voice = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
+ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
+ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "42d6336bf954c7d97ce0a8ac735207026c378b53" }
 tauri-plugin-updater = "=2.13.1"
 tauri-plugin-process = "=2.4.0"
 
