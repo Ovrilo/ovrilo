@@ -46,6 +46,10 @@ pub fn run() {
             voice::voice_set_push_to_talk,
             voice::voice_set_participant_volume,
             voice::voice_set_participant_muted,
+            voice::voice_list_screen_sources,
+            voice::voice_start_screen_share,
+            voice::voice_stop_screen_share,
+            voice::voice_watch_screen_share,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

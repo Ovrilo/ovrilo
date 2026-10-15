@@ -12,7 +12,7 @@ export function useJoinVoice() {
         params: { path: { channelId } },
       });
       if (!data) throw error;
-      await voice.join(channelId, data.serverUrl, data.token);
+      await voice.join(channelId, data.serverUrl, data.token, data.canShareScreen);
     },
   });
 }

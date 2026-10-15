@@ -100,8 +100,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Issues a short-lived SFU grant for a voice channel the caller may join. Requires ConnectVoice. */
+        /** Issues a short-lived SFU grant for a voice channel the caller may join. Requires ConnectVoice; screen-share sources are added with ShareScreen while the server has screen sharing on. */
         post: operations["JoinVoiceChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channelId}/voice/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issues a short-lived, hidden, subscribe-only SFU grant for watching screen shares in a voice channel. Same rights as joining; 403 voice.screen_share_disabled while the server has screen sharing off. */
+        post: operations["WatchVoiceChannelScreenShares"];
         delete?: never;
         options?: never;
         head?: never;
@@ -743,6 +760,7 @@ export interface components {
             token: string;
             /** Format: date-time */
             expiresAt: string;
+            canShareScreen: boolean;
         };
         VoiceParticipantResponse: {
             /** Format: uuid */
@@ -751,6 +769,13 @@ export interface components {
             muted: boolean;
             /** Format: uuid */
             avatarAssetId: null | string;
+            screenSharing: boolean;
+        };
+        VoiceWatchResponse: {
+            serverUrl: string;
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
         };
     };
     responses: never;
@@ -1058,6 +1083,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VoiceJoinResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    WatchVoiceChannelScreenShares: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceWatchResponse"];
                 };
             };
             /** @description Unauthorized */

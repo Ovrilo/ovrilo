@@ -9,6 +9,8 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 - Community settings: owners can rename the community, describe it and change its icon in one place.
 - Owners can delete a community. It disappears for everyone right away; typing its name confirms the deletion.
 - Members can leave a community.
+- Screen sharing (preview, available when your server turns it on): in a voice channel, share a window or your whole screen in 720p or 1080p. A shared window can bring its application's sound along, and your voice chat is never included.
+- People who are sharing show a LIVE badge in the channel list and the voice room; click Watch to see their screen, full screen if you like. Their sound plays while you watch.
 
 ### Changed
 - Forms match the dark theme: topic and description boxes, dropdowns and the channel type picker.

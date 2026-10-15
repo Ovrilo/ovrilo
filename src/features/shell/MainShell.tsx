@@ -199,6 +199,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                       <li>
                         <Avatar name={user.displayName} assetId={user.avatarAssetId} size="xs" speaking={snapshot.selfSpeaking} />
                         <span className="member-name">{user.displayName}</span>
+                        {snapshot.screenShare && <span className="live-pill">LIVE</span>}
                         <MemberIcons
                           muted={snapshot.microphoneMuted || snapshot.deafened}
                           deafened={snapshot.deafened}
@@ -221,6 +222,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                             muted={p.locallyMuted}
                           />
                           <span className="member-name">{p.name}</span>
+                          {p.screenSharing && <span className="live-pill">LIVE</span>}
                           <MemberIcons muted={p.muted} deafened={false} locallyMuted={p.locallyMuted} />
                         </li>
                       ))}
@@ -391,6 +393,7 @@ function ServerMembers({
         <li key={p.userId}>
           <Avatar name={p.displayName} assetId={p.avatarAssetId} size="xs" />
           <span className="member-name">{p.displayName}</span>
+          {p.screenSharing && <span className="live-pill">LIVE</span>}
           <MemberIcons muted={p.muted} deafened={false} />
         </li>
       ))}

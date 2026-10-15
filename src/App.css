@@ -1133,6 +1133,22 @@ button.small-button {
   background: var(--bg);
 }
 
+.participant-tile {
+  position: relative;
+}
+
+.participant-tile .tile-badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+}
+
+.small-button {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
 .participant-name {
   max-width: 100%;
   overflow: hidden;
@@ -2013,4 +2029,218 @@ button.small-button {
   * {
     transition: none !important;
   }
+}
+
+/* ---------- Screen sharing (ADR-0017) ---------- */
+
+.live-badge,
+.live-pill {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--danger);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+}
+
+.live-pill {
+  margin-left: auto;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.voice-dock-channel .live-badge {
+  margin-right: var(--space-1);
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.sharing-banner,
+.live-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg));
+}
+
+.sharing-banner > span:nth-child(2),
+.live-list li > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.voice-lobby > .live-list,
+.voice-lobby > .stream-stage {
+  width: min(720px, 100%);
+}
+
+.stream-stage {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--bg);
+}
+
+.stream-stage-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.stream-stage-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-stage-body {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  max-height: 60vh;
+  background: var(--backdrop);
+}
+
+.stream-stage-body video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--bg);
+}
+
+.stream-stage-body video.hidden {
+  display: none;
+}
+
+.share-picker-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.share-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.share-source {
+  position: relative;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.share-source:hover {
+  background: var(--surface-2);
+}
+
+.share-source input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.share-source:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg));
+}
+
+.share-source:has(input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.share-source > svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.share-source > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.share-source strong,
+.share-source strong + span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-source strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.share-source strong + span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.share-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.checkbox-row {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-top: 22px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  min-height: auto;
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
+.checkbox-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }

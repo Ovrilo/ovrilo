@@ -1,4 +1,4 @@
-import { PhoneOff } from "lucide-react";
+import { PhoneOff, ScreenShareOff } from "lucide-react";
 
 import { IconButton } from "../../components/ui";
 import { QualityBadge } from "./QualityBadge";
@@ -24,8 +24,14 @@ export function VoiceDock({ channelName, onOpen }: { channelName: string; onOpen
           {STATUS[snapshot.connection]}
           {snapshot.connection === "connected" && <QualityBadge summary={quality} compact />}
         </span>
-        <span className="voice-dock-channel">{channelName}</span>
+        <span className="voice-dock-channel">
+          {snapshot.screenShare && <span className="live-badge">LIVE</span>}
+          {channelName}
+        </span>
       </button>
+      {snapshot.screenShare && (
+        <IconButton icon={ScreenShareOff} label="Stop sharing" onClick={() => void voice.stopScreenShare()} />
+      )}
       <IconButton icon={PhoneOff} label="Leave voice" tone="danger" onClick={() => void voice.leave()} />
     </section>
   );
