@@ -4,8 +4,14 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-16
+
+Quieter calls: your friends stop hearing your keyboard, and you can set how loud your microphone and speakers are.
+
 ### New
-- Enhanced noise suppression, on by default: others no longer hear your keyboard, mouse clicks, fan or room, and your microphone stays silent between words. Choose Enhanced, Standard or Off under Settings → Audio.
+- Enhanced noise suppression, on by default: others no longer hear your keyboard, mouse clicks, fan or room, and your microphone stays silent between words. A voice far from the microphone stays clear. Choose Enhanced, Standard or Off under Settings → Voice & audio.
+- Microphone and speaker volume sliders in Settings → Voice & audio, from 0 to 200 %.
+- Audio settings are easier to read: microphone and speaker side by side, and input mode and noise suppression as clear choices.
 
 ### Fixed
 - The connection badge no longer says "Unstable" on a fast connection. Latency counts as unstable from 50 ms and poor from 100 ms, and a single audio hiccup on your own computer no longer changes the rating.
