@@ -6,14 +6,14 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [0.6.0] - 2026-10-15
 
-Screen sharing, a voice room that looks like a call, and community management. Screen sharing needs your server to be updated and to turn it on.
+Screen sharing, a voice room that looks like a call, and community management.
 
 ### New
 - Click the community name for its menu: invite people, community settings, create a channel, leave or delete the community.
 - Community settings: owners can rename the community, describe it and change its icon in one place.
 - Owners can delete a community. It disappears for everyone right away; typing its name confirms the deletion.
 - Members can leave a community.
-- Screen sharing (preview, available when your server turns it on): in a voice channel, share a window or your whole screen in 720p or 1080p. A shared window can bring its application's sound along, and your voice chat is never included.
+- Screen sharing (preview): in a voice channel, share a window or your whole screen in 720p or 1080p. A shared window can bring its application's sound along, and your voice chat is never included.
 - Choose what your share is for: "Sharp text" keeps code and documents crisp with the least data, "Smooth motion" keeps games and video fluid.
 - The voice room looks like a call: everyone and every stream as a tile, a green ring around whoever talks, and round buttons for mute, deafen, share and leave.
 - Streams have their own tiles. Click one to watch it large with the others below; double-click (or the button) for full screen. While you share, you can preview your own stream.
