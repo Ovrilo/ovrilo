@@ -8,7 +8,7 @@ import { PicturePicker } from "../../components/PicturePicker";
 import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
-import { useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
+import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
 type Tab = "audio" | "account";
 
@@ -61,9 +61,9 @@ function AudioSettings() {
         <RefreshCw size={14} aria-hidden="true" /> Refresh devices
       </button>
       <InputMode />
+      <NoiseSuppressionSetting />
       <p className="muted small">
-        Changes apply immediately, also during a call. Echo cancellation, noise suppression and automatic gain are always
-        on for now.
+        Changes apply immediately, also during a call. Echo cancellation and automatic gain are always on.
       </p>
     </div>
   );
@@ -115,6 +115,44 @@ function InputMode() {
         The key still reaches your game. Mouse side buttons work too. Games running as administrator may need Ovrilo
         to run as administrator as well.
       </p>
+    </fieldset>
+  );
+}
+
+const NOISE_OPTIONS: { value: NoiseSuppression; label: string; hint: string }[] = [
+  {
+    value: "enhanced",
+    label: "Enhanced",
+    hint: "removes keyboard and mouse clicks and room noise, and stays silent between words",
+  },
+  { value: "standard", label: "Standard", hint: "reduces steady noise such as fans and hum" },
+  { value: "off", label: "Off", hint: "sends your microphone as it is" },
+];
+
+function NoiseSuppressionSetting() {
+  const { snapshot } = useVoice();
+  const chosen = snapshot.noiseSuppression;
+  const fellBack = chosen === "enhanced" && snapshot.noiseSuppressionActive !== "enhanced";
+
+  return (
+    <fieldset className="input-mode">
+      <legend>Noise suppression</legend>
+      {NOISE_OPTIONS.map((option) => (
+        <label className="radio" key={option.value}>
+          <input
+            type="radio"
+            name="noise-suppression"
+            checked={chosen === option.value}
+            onChange={() => void voice.setNoiseSuppression(option.value)}
+          />
+          {option.label} <span className="muted small">— {option.hint}</span>
+        </label>
+      ))}
+      {fellBack && (
+        <p className="form-error small" role="status">
+          Enhanced is not running: this computer could not keep up, so Standard is used. Choose Enhanced again to retry.
+        </p>
+      )}
     </fieldset>
   );
 }

@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### New
+- Enhanced noise suppression, on by default: others no longer hear your keyboard, mouse clicks, fan or room, and your microphone stays silent between words. Choose Enhanced, Standard or Off under Settings → Audio.
+
 ## [0.6.0] - 2026-10-15
 
 Screen sharing, a voice room that looks like a call, and community management.

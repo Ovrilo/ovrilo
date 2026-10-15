@@ -55,6 +55,9 @@ export interface ScreenSource {
   audioAvailable: boolean;
 }
 
+/** How the microphone is cleaned before it is sent (ADR-0018). */
+export type NoiseSuppression = "off" | "standard" | "enhanced";
+
 export interface VoiceSnapshot {
   connection: VoiceConnection;
   channelId: string | null;
@@ -74,6 +77,9 @@ export interface VoiceSnapshot {
   pushToTalkKey: PushToTalkKey | null;
   /** Microphone audio is allowed out right now (not muted/deafened; PTT key held in PTT mode). */
   transmitting: boolean;
+  /** The chosen noise suppression, and the one actually running (Enhanced can fall back). */
+  noiseSuppression: NoiseSuppression;
+  noiseSuppressionActive: NoiseSuppression;
   screenShare: ScreenShare | null;
   /** Participant whose screen-share sound the engine plays. */
   watchingScreen: string | null;
@@ -105,6 +111,8 @@ const initialSnapshot: VoiceSnapshot = {
   pushToTalk: false,
   pushToTalkKey: null,
   transmitting: true,
+  noiseSuppression: "enhanced",
+  noiseSuppressionActive: "standard",
   screenShare: null,
   watchingScreen: null,
 };
@@ -216,5 +224,6 @@ export const voice = {
   setScreenVolume: (participantId: string, percent: number) =>
     command("voice_set_participant_volume", { participantId: `${participantId}#screen`, percent: Math.round(percent) }),
   setPushToTalk: (enabled: boolean, key: PushToTalkKey | null) => command("voice_set_push_to_talk", { enabled, key }),
+  setNoiseSuppression: (mode: NoiseSuppression) => command("voice_set_noise_suppression", { mode }),
   reportFailure,
 };
