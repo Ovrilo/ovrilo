@@ -190,7 +190,11 @@ export function InviteDialog({ onClose, communityId }: DialogProps & { community
   );
 }
 
-export function CreateChannelDialog({ onClose, communityId }: DialogProps & { communityId: string }) {
+export function CreateChannelDialog({
+  onClose,
+  communityId,
+  type,
+}: DialogProps & { communityId: string; type: Schemas["ChannelType"] }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const mutation = useMutation({
@@ -218,10 +222,10 @@ export function CreateChannelDialog({ onClose, communityId }: DialogProps & { co
         <fieldset className="segmented-field">
           <legend>Type</legend>
           <label>
-            <input type="radio" name="type" value="voice" defaultChecked /> Voice
+            <input type="radio" name="type" value="text" defaultChecked={type === "text"} /> Text
           </label>
           <label>
-            <input type="radio" name="type" value="text" /> Text
+            <input type="radio" name="type" value="voice" defaultChecked={type === "voice"} /> Voice
           </label>
         </fieldset>
         <label>
@@ -231,6 +235,82 @@ export function CreateChannelDialog({ onClose, communityId }: DialogProps & { co
         <FormError error={mutation.error} />
         <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Create" />
       </form>
+    </Dialog>
+  );
+}
+
+/** Rename a channel or change its topic (owners). Members see it through ChannelsChanged. */
+export function EditChannelDialog({ onClose, channel }: DialogProps & { channel: Schemas["ChannelResponse"] }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (body: Schemas["UpdateChannelRequest"]) =>
+      unwrap(api.PATCH("/channels/{channelId}", { params: { path: { channelId: channel.id } }, body })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.channels(channel.communityId) });
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog title="Edit channel" onClose={onClose}>
+      <form
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          // An empty topic clears it.
+          mutation.mutate({ name: String(form.get("name") ?? ""), topic: String(form.get("topic") ?? ""), position: null });
+        }}
+      >
+        <label>
+          Name
+          <input name="name" required maxLength={100} defaultValue={channel.name} autoFocus />
+        </label>
+        {channel.type === "text" && (
+          <label>
+            Topic
+            <textarea name="topic" maxLength={1024} rows={3} defaultValue={channel.topic ?? ""} placeholder="What is this channel about?" />
+          </label>
+        )}
+        <FormError error={mutation.error} />
+        <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Save" />
+      </form>
+    </Dialog>
+  );
+}
+
+export function DeleteChannelDialog({ onClose, channel }: DialogProps & { channel: Schemas["ChannelResponse"] }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE("/channels/{channelId}", { params: { path: { channelId: channel.id } } });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.channels(channel.communityId) });
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog title="Delete channel" onClose={onClose}>
+      <p>
+        Delete <strong>{channel.type === "text" ? `#${channel.name}` : channel.name}</strong>?{" "}
+        {channel.type === "text"
+          ? "Its messages will no longer be visible to anyone."
+          : "Everyone in it will be disconnected."}{" "}
+        This cannot be undone.
+      </p>
+      <FormError error={mutation.error} />
+      <div className="dialog-actions">
+        <button type="button" onClick={onClose} autoFocus>
+          Cancel
+        </button>
+        <button type="button" className="danger" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          {mutation.isPending ? "Please wait…" : "Delete channel"}
+        </button>
+      </div>
     </Dialog>
   );
 }

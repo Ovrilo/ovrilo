@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { ContextMenu } from "../../components/ContextMenu";
 import { useVoice, voice } from "./voice";
 
 export interface ParticipantMenuTarget {
@@ -15,41 +16,9 @@ export interface ParticipantMenuTarget {
 export function ParticipantMenu({ target, onClose }: { target: ParticipantMenuTarget; onClose: () => void }) {
   const { snapshot } = useVoice();
   const participant = snapshot.participants.find((p) => p.id === target.participantId);
-  const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: target.x, top: target.y });
   const [volume, setVolume] = useState(participant?.volume ?? 100);
 
   useEffect(() => setVolume(participant?.volume ?? 100), [participant?.volume]);
-
-  // Keep the menu inside the window.
-  useLayoutEffect(() => {
-    const menu = ref.current;
-    if (!menu) return;
-    const { width, height } = menu.getBoundingClientRect();
-    setPosition({
-      left: Math.max(8, Math.min(target.x, window.innerWidth - width - 8)),
-      top: Math.max(8, Math.min(target.y, window.innerHeight - height - 8)),
-    });
-    menu.querySelector<HTMLInputElement>("input")?.focus();
-  }, [target.x, target.y]);
-
-  useEffect(() => {
-    const close = (event: Event) => {
-      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
-      if (event instanceof MouseEvent && ref.current?.contains(event.target as Node)) return;
-      onClose();
-    };
-    window.addEventListener("mousedown", close, true);
-    window.addEventListener("keydown", close);
-    window.addEventListener("resize", onClose);
-    window.addEventListener("blur", onClose);
-    return () => {
-      window.removeEventListener("mousedown", close, true);
-      window.removeEventListener("keydown", close);
-      window.removeEventListener("resize", onClose);
-      window.removeEventListener("blur", onClose);
-    };
-  }, [onClose]);
 
   // The participant left while the menu was open.
   useEffect(() => {
@@ -62,14 +31,7 @@ export function ParticipantMenu({ target, onClose }: { target: ParticipantMenuTa
   };
 
   return (
-    <div
-      ref={ref}
-      className="context-menu"
-      role="menu"
-      aria-label={`${participant.name} options`}
-      style={position}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <ContextMenu x={target.x} y={target.y} label={`${participant.name} options`} onClose={onClose}>
       <div className="context-menu-title">{participant.name}</div>
       <label className="context-menu-volume">
         <span>
@@ -111,6 +73,6 @@ export function ParticipantMenu({ target, onClose }: { target: ParticipantMenuTa
         Mute for me
       </label>
       <p className="context-menu-hint">Only changes what you hear.</p>
-    </div>
+    </ContextMenu>
   );
 }
