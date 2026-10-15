@@ -2044,21 +2044,29 @@ button.small-button {
   user-select: all;
 }
 
+/* Settings: section list on the left, one scrolling page on the right. */
+.dialog:has(.settings) {
+  width: min(760px, 100% - 2 * var(--space-5));
+}
+
 .settings {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 168px 1fr;
   gap: var(--space-5);
-  min-height: 260px;
+  min-height: 420px;
 }
 
 .settings-tabs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
+  padding-right: var(--space-4);
+  border-right: 1px solid var(--border);
 }
 
 .settings-tabs button {
   justify-content: flex-start;
+  min-height: 34px;
   border-color: transparent;
   background: transparent;
   color: var(--text-secondary);
@@ -2069,39 +2077,197 @@ button.small-button {
   color: var(--text-primary);
 }
 
-.settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.settings-body {
+  max-height: min(64vh, 600px);
+  margin-right: calc(-1 * var(--space-2));
+  padding-right: var(--space-2);
+  overflow-y: auto;
 }
 
-.input-mode {
+.settings-section,
+.settings-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-5);
+}
+
+/* A titled group of related controls; fieldsets reset so legends line up with headings. */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
   margin: 0;
-  padding: var(--space-4) 0 0;
+  padding: 0;
   border: 0;
-  border-top: 1px solid var(--border);
 }
 
-.input-mode legend {
-  float: left;
-  margin-bottom: var(--space-1);
+.settings-group h3,
+.settings-group legend {
+  padding: 0;
   color: var(--text-primary);
+  font-size: 14px;
   font-weight: 600;
 }
 
-.input-mode .radio {
-  flex-direction: row;
-  align-items: baseline;
-  gap: var(--space-2);
-  color: var(--text-primary);
-  font-size: 14px;
+.settings-group legend {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--space-3);
 }
 
-.input-mode .radio input {
-  min-height: auto;
+.settings-group legend + * {
+  clear: both;
+}
+
+.settings-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.device-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface-1));
+}
+
+.device-panel-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.device-panel-title svg {
+  color: var(--text-secondary);
+}
+
+.volume-slider {
+  gap: var(--space-2);
+}
+
+.volume-slider-head {
+  display: flex;
+  justify-content: space-between;
+}
+
+.volume-value {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filled track up to the value (--fill), with a thin mark at 100 %. */
+.volume-slider input[type="range"] {
+  --fill: 50%;
+  min-height: 0;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--text-secondary), var(--text-secondary)) 50% 50% / 2px 10px no-repeat,
+    linear-gradient(to right, var(--primary) var(--fill), var(--surface-2) var(--fill));
+  appearance: none;
+  cursor: pointer;
+}
+
+.volume-slider input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: var(--text-primary);
+  appearance: none;
+}
+
+.volume-slider input[type="range"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.choice {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.choice svg {
+  margin-bottom: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.choice:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.choice.selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-1));
+}
+
+.choice.selected svg {
+  color: var(--primary);
+}
+
+.choice:has(input:focus-visible),
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-control) + 3px);
+  background: var(--bg);
+}
+
+.segmented label {
+  display: block;
+  padding: 6px var(--space-4);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented label:hover {
+  color: var(--text-primary);
+}
+
+.segmented label.selected {
+  background: var(--primary);
+  color: #fff;
 }
 
 .ptt-key {
@@ -2109,6 +2275,31 @@ button.small-button {
   align-items: center;
   gap: var(--space-3);
   min-height: 40px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.settings-footnote {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 720px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    padding: 0 0 var(--space-3);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .device-grid,
+  .choice-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .key-capture {

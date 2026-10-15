@@ -3345,7 +3345,7 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=e465cf30f23b07c45768b9793b28b7483c29f0dd#e465cf30f23b07c45768b9793b28b7483c29f0dd"
+source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=56d0c5677ef696a59c5a761706113c5ca648acc5#56d0c5677ef696a59c5a761706113c5ca648acc5"
 dependencies = [
  "tokio",
 ]
@@ -3353,7 +3353,7 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice-cpal"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=e465cf30f23b07c45768b9793b28b7483c29f0dd#e465cf30f23b07c45768b9793b28b7483c29f0dd"
+source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=56d0c5677ef696a59c5a761706113c5ca648acc5#56d0c5677ef696a59c5a761706113c5ca648acc5"
 dependencies = [
  "cpal",
  "ovrilo-voice",
@@ -3364,7 +3364,7 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice-denoise"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=e465cf30f23b07c45768b9793b28b7483c29f0dd#e465cf30f23b07c45768b9793b28b7483c29f0dd"
+source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=56d0c5677ef696a59c5a761706113c5ca648acc5#56d0c5677ef696a59c5a761706113c5ca648acc5"
 dependencies = [
  "deep_filter",
  "ndarray",
@@ -3378,7 +3378,7 @@ dependencies = [
 [[package]]
 name = "ovrilo-voice-livekit"
 version = "0.1.0"
-source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=e465cf30f23b07c45768b9793b28b7483c29f0dd#e465cf30f23b07c45768b9793b28b7483c29f0dd"
+source = "git+https://github.com/Ovrilo/ovrilo-voice?rev=56d0c5677ef696a59c5a761706113c5ca648acc5#56d0c5677ef696a59c5a761706113c5ca648acc5"
 dependencies = [
  "futures-util",
  "livekit",

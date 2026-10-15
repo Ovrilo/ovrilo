@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::credentials::CommandError;
 use crate::ptt::KeyWatcher;
 use crate::settings::{
-    MAX_PARTICIPANT_VOLUMES, NoiseSuppressionChoice, PushToTalkKey, SettingsStore,
+    MAX_PARTICIPANT_VOLUMES, NoiseSuppressionChoice, PushToTalkKey, SettingsStore, Volume,
 };
 use crate::stats_log::StatsLog;
 
@@ -69,6 +69,9 @@ pub struct VoiceSnapshot {
     /// runs: Enhanced falls back to `standard` when this computer cannot keep up.
     noise_suppression: &'static str,
     noise_suppression_active: &'static str,
+    /// Master microphone and speaker volume, percent (100 = unchanged).
+    input_volume: u16,
+    output_volume: u16,
     /// The local screen share while it runs (ADR-0017).
     screen_share: Option<ScreenShareDto>,
     /// Participant whose screen-share sound the engine plays (the share the user watches).
@@ -272,6 +275,8 @@ impl Default for VoiceSnapshot {
             transmitting: true,
             noise_suppression: NoiseSuppressionChoice::default().as_str(),
             noise_suppression_active: "standard",
+            input_volume: 100,
+            output_volume: 100,
             screen_share: None,
             watching_screen: None,
             volumes: BTreeMap::new(),
@@ -305,6 +310,8 @@ impl VoiceHost {
             output_device_id: saved.output_device_id.clone(),
             push_to_talk_key: saved.push_to_talk_key.clone(),
             noise_suppression: saved.noise_suppression.as_str(),
+            input_volume: saved.input_volume.0,
+            output_volume: saved.output_volume.0,
             volumes: saved.participant_volumes.clone(),
             locally_muted: saved.muted_participants.clone(),
             ..VoiceSnapshot::default()
@@ -393,6 +400,8 @@ impl VoiceHost {
         engine.send(VoiceCommand::SetNoiseSuppression(engine_mode(
             saved.noise_suppression,
         )));
+        engine.send(VoiceCommand::SetInputVolume(saved.input_volume.0));
+        engine.send(VoiceCommand::SetOutputVolume(saved.output_volume.0));
         engine.send(VoiceCommand::RefreshDevices);
         Self {
             engine,
@@ -471,6 +480,8 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
         VoiceEvent::DeafenedChanged(deafened) => state.deafened = deafened,
         VoiceEvent::PushToTalkChanged(enabled) => state.push_to_talk = enabled,
+        VoiceEvent::InputVolumeChanged(percent) => state.input_volume = percent,
+        VoiceEvent::OutputVolumeChanged(percent) => state.output_volume = percent,
         VoiceEvent::NoiseSuppressionChanged(mode) => {
             state.noise_suppression_active = match mode {
                 NoiseSuppression::Off => "off",
@@ -851,6 +862,28 @@ pub fn voice_set_noise_suppression(
     host.update(|s| s.noise_suppression = choice.as_str());
     let _ = app.emit(STATE_CHANGED, voice_get_state(host));
     Ok(())
+}
+
+/// Master microphone volume, 0–200 %. Saved for the next start; the engine confirms it.
+#[tauri::command]
+pub fn voice_set_input_volume(
+    host: State<'_, VoiceHost>,
+    percent: u16,
+) -> Result<(), CommandError> {
+    let percent = percent.min(200);
+    host.settings.update(|s| s.input_volume = Volume(percent));
+    host.send(VoiceCommand::SetInputVolume(percent))
+}
+
+/// Master speaker volume, 0–200 %. Saved for the next start; the engine confirms it.
+#[tauri::command]
+pub fn voice_set_output_volume(
+    host: State<'_, VoiceHost>,
+    percent: u16,
+) -> Result<(), CommandError> {
+    let percent = percent.min(200);
+    host.settings.update(|s| s.output_volume = Volume(percent));
+    host.send(VoiceCommand::SetOutputVolume(percent))
 }
 
 fn engine_mode(choice: NoiseSuppressionChoice) -> NoiseSuppression {

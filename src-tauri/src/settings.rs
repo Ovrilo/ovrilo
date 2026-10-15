@@ -24,6 +24,20 @@ pub struct DesktopSettings {
     pub muted_participants: BTreeSet<String>,
     /// Microphone noise suppression (ADR-0018). Missing in older files: Enhanced.
     pub noise_suppression: NoiseSuppressionChoice,
+    /// Master volumes in percent (0–200, 100 = unchanged).
+    pub input_volume: Volume,
+    pub output_volume: Volume,
+}
+
+/// A volume in percent; 100 when missing from older files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Volume(pub u16);
+
+impl Default for Volume {
+    fn default() -> Self {
+        Self(100)
+    }
 }
 
 /// How the microphone is cleaned before it is sent.
@@ -152,6 +166,8 @@ fn sanitize(mut settings: DesktopSettings) -> DesktopSettings {
     while settings.muted_participants.len() > MAX_PARTICIPANT_VOLUMES {
         settings.muted_participants.pop_last();
     }
+    settings.input_volume.0 = settings.input_volume.0.min(200);
+    settings.output_volume.0 = settings.output_volume.0.min(200);
     settings
 }
 
@@ -231,6 +247,17 @@ mod tests {
             Some(NoiseSuppressionChoice::Off)
         );
         assert_eq!(NoiseSuppressionChoice::parse("ultra"), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn volumes_default_to_100_and_are_clamped() {
+        let dir = temp_dir("volumes");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join(FILE_NAME), r#"{"outputVolume":450}"#).unwrap();
+        let store = SettingsStore::load(Some(dir.clone()));
+        assert_eq!(store.get().input_volume, Volume(100));
+        assert_eq!(store.get().output_volume, Volume(200));
         let _ = fs::remove_dir_all(&dir);
     }
 }
