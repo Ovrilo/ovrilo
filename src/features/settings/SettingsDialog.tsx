@@ -5,7 +5,7 @@ import type { Schemas } from "../../api/client";
 import { useApi, useSession } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
 import { PicturePicker } from "../../components/PicturePicker";
-import { Avatar } from "../../components/ui";
+import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
@@ -213,14 +213,14 @@ function DeviceSelect({
   return (
     <label>
       {label}
-      <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
+      <Select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
         <option value="">System default{defaultName ? ` (${defaultName})` : ""}</option>
         {devices.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }

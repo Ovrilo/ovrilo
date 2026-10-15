@@ -2,18 +2,21 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "re
 
 /**
  * A right-click menu at (`x`, `y`), kept inside the window. Closes on Escape, a click outside,
- * resize or when the window loses focus; the parent closes it by unmounting.
+ * resize or when the window loses focus; the parent closes it by unmounting. Clicks on `anchor`
+ * (the button that toggles the menu) are left to that button.
  */
 export function ContextMenu({
   x,
   y,
   label,
+  anchor,
   onClose,
   children,
 }: {
   x: number;
   y: number;
   label: string;
+  anchor?: HTMLElement | null;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -35,6 +38,7 @@ export function ContextMenu({
     const close = (event: Event) => {
       if (event instanceof KeyboardEvent && event.key !== "Escape") return;
       if (event instanceof MouseEvent && ref.current?.contains(event.target as Node)) return;
+      if (event instanceof MouseEvent && anchor?.contains(event.target as Node)) return;
       onClose();
     };
     window.addEventListener("mousedown", close, true);
@@ -47,7 +51,7 @@ export function ContextMenu({
       window.removeEventListener("resize", onClose);
       window.removeEventListener("blur", onClose);
     };
-  }, [onClose]);
+  }, [onClose, anchor]);
 
   return (
     <div

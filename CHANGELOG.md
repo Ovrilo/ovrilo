@@ -2,6 +2,18 @@
 
 User-facing changes to the Ovrilo desktop app. Each release's notes are taken from its section here by the release workflow, so write for the people who use the app, not for developers.
 
+## [Unreleased]
+
+### New
+- Click the community name for its menu: invite people, community settings, create a channel, leave or delete the community.
+- Community settings: owners can rename the community, describe it and change its icon in one place.
+- Owners can delete a community. It disappears for everyone right away; typing its name confirms the deletion.
+- Members can leave a community.
+
+### Changed
+- Forms match the dark theme: topic and description boxes, dropdowns and the channel type picker.
+- The app no longer offers browser-style autofill suggestions in its forms.
+
 ## [0.5.0] - 2026-10-15
 
 Communities that are ready to use, and channels you can manage. Some of this needs your server to be updated as well.

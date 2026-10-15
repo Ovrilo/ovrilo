@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react";
-import type { ButtonHTMLAttributes } from "react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
+import type { ButtonHTMLAttributes, SelectHTMLAttributes } from "react";
 
 import { useMediaImage } from "../media/useMediaImage";
 
@@ -94,5 +94,15 @@ export function IconButton({ icon: Icon, label, tone = "default", className, ...
     >
       <Icon size={18} strokeWidth={2} aria-hidden="true" />
     </button>
+  );
+}
+
+/** A native select with the app's chevron (the platform arrow does not follow the theme). */
+export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="select-control">
+      <select {...props} />
+      <ChevronDown size={16} aria-hidden="true" />
+    </span>
   );
 }
