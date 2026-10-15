@@ -2,13 +2,15 @@
 // Usage: pnpm release:build <api-url> <media-url>
 //   e.g. pnpm release:build https://api.example.com https://media.example.com
 //
-// The API origin is compiled into the frontend (VITE_OVRILO_API_URL); both origins replace the
-// development ones in the CSP connect-src (images are read and uploaded with presigned storage URLs).
+// The API origin is compiled into the frontend (VITE_OVRILO_API_URL); the API (https and wss, for the
+// realtime hub) and storage origins replace the development ones in the CSP connect-src.
 // Only HTTPS is accepted, except http://localhost / 127.0.0.1 for local installer testing.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { releaseCsp } from "./csp.mjs";
 
 const [rawApi, rawMedia] = process.argv.slice(2);
 if (!rawApi || !rawMedia) {
@@ -36,16 +38,14 @@ const api = parseOrigin(rawApi, "API");
 const media = parseOrigin(rawMedia, "media");
 
 const tauriConfig = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
-const devCsp = tauriConfig.app.security.csp;
-// Replace the development origins with the release ones.
-const devOrigins = { api: "http://localhost:5158", media: "http://127.0.0.1:9000" };
-for (const origin of Object.values(devOrigins)) {
-  if (!devCsp.includes(` ${origin}`)) {
-    console.error(`Could not find the development origin ${origin} in the CSP; update this script.`);
-    process.exit(1);
-  }
+let csp;
+try {
+  // Development API (http and ws) and storage origins → release ones; see scripts/csp.mjs.
+  csp = releaseCsp(tauriConfig.app.security.csp, api.origin, media.origin);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
 }
-const csp = devCsp.replace(` ${devOrigins.api}`, ` ${api.origin}`).replace(` ${devOrigins.media}`, ` ${media.origin}`);
 
 // Passed as a file: JSON on the Windows command line does not survive shell quoting.
 const dir = mkdtempSync(join(tmpdir(), "ovrilo-release-"));
