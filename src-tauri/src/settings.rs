@@ -1,4 +1,4 @@
-//! Desktop preferences persisted across restarts (selected devices, push-to-talk).
+//! Desktop preferences persisted across restarts (devices, push-to-talk, noise suppression).
 //!
 //! Stored as JSON in the app config directory. Not secret; never holds tokens (ADR-0011).
 
@@ -22,6 +22,37 @@ pub struct DesktopSettings {
     pub participant_volumes: BTreeMap<String, u16>,
     /// Users muted for this client only (their volume is kept for unmuting).
     pub muted_participants: BTreeSet<String>,
+    /// Microphone noise suppression (ADR-0018). Missing in older files: Enhanced.
+    pub noise_suppression: NoiseSuppressionChoice,
+}
+
+/// How the microphone is cleaned before it is sent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoiseSuppressionChoice {
+    Off,
+    Standard,
+    #[default]
+    Enhanced,
+}
+
+impl NoiseSuppressionChoice {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Standard => "standard",
+            Self::Enhanced => "enhanced",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "off" => Some(Self::Off),
+            "standard" => Some(Self::Standard),
+            "enhanced" => Some(Self::Enhanced),
+            _ => None,
+        }
+    }
 }
 
 /// Upper bound on remembered per-user volumes, so the file cannot grow without limit.
@@ -174,6 +205,32 @@ mod tests {
         let settings = SettingsStore::load(Some(dir.clone())).get();
         assert_eq!(settings.push_to_talk_key, None, "left click is rejected");
         assert!(!settings.push_to_talk, "push-to-talk needs a key");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn noise_suppression_defaults_to_enhanced_and_is_remembered() {
+        let dir = temp_dir("noise");
+        fs::create_dir_all(&dir).unwrap();
+        // A file written before the setting existed.
+        fs::write(dir.join(FILE_NAME), r#"{"pushToTalk":false}"#).unwrap();
+        let store = SettingsStore::load(Some(dir.clone()));
+        assert_eq!(
+            store.get().noise_suppression,
+            NoiseSuppressionChoice::Enhanced
+        );
+
+        store.update(|s| s.noise_suppression = NoiseSuppressionChoice::Standard);
+        let reloaded = SettingsStore::load(Some(dir.clone()));
+        assert_eq!(
+            reloaded.get().noise_suppression,
+            NoiseSuppressionChoice::Standard
+        );
+        assert_eq!(
+            NoiseSuppressionChoice::parse("off"),
+            Some(NoiseSuppressionChoice::Off)
+        );
+        assert_eq!(NoiseSuppressionChoice::parse("ultra"), None);
         let _ = fs::remove_dir_all(&dir);
     }
 }

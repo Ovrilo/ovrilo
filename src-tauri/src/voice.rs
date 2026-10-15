@@ -9,9 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ovrilo_voice::{
-    AudioDevice, ConnectionState, DeviceId, ParticipantId, ScreenShare, ScreenSource,
-    ScreenSourceId, ScreenSourceKind, ShareOptimization, SharePreset, VoiceCommand, VoiceEngine,
-    VoiceEngineHandle, VoiceErrorCode, VoiceEvent, VoiceStats,
+    AudioDevice, ConnectionState, DeviceId, NoiseSuppression, ParticipantId, ScreenShare,
+    ScreenSource, ScreenSourceId, ScreenSourceKind, ShareOptimization, SharePreset, VoiceCommand,
+    VoiceEngine, VoiceEngineHandle, VoiceErrorCode, VoiceEvent, VoiceStats,
 };
 use ovrilo_voice_cpal::CpalBackend;
 use ovrilo_voice_livekit::{LiveKitTransport, ProcessingConfig, webrtc_processing};
@@ -20,7 +20,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::credentials::CommandError;
 use crate::ptt::KeyWatcher;
-use crate::settings::{MAX_PARTICIPANT_VOLUMES, PushToTalkKey, SettingsStore};
+use crate::settings::{
+    MAX_PARTICIPANT_VOLUMES, NoiseSuppressionChoice, PushToTalkKey, SettingsStore,
+};
 use crate::stats_log::StatsLog;
 
 pub const STATE_CHANGED: &str = "voice://state-changed";
@@ -63,6 +65,10 @@ pub struct VoiceSnapshot {
     push_to_talk_key: Option<PushToTalkKey>,
     /// Microphone audio is allowed out right now (see `TransmittingChanged`).
     transmitting: bool,
+    /// Chosen noise suppression (`off` | `standard` | `enhanced`), and the one the engine actually
+    /// runs: Enhanced falls back to `standard` when this computer cannot keep up.
+    noise_suppression: &'static str,
+    noise_suppression_active: &'static str,
     /// The local screen share while it runs (ADR-0017).
     screen_share: Option<ScreenShareDto>,
     /// Participant whose screen-share sound the engine plays (the share the user watches).
@@ -264,6 +270,8 @@ impl Default for VoiceSnapshot {
             push_to_talk: false,
             push_to_talk_key: None,
             transmitting: true,
+            noise_suppression: NoiseSuppressionChoice::default().as_str(),
+            noise_suppression_active: "standard",
             screen_share: None,
             watching_screen: None,
             volumes: BTreeMap::new(),
@@ -296,6 +304,7 @@ impl VoiceHost {
             input_device_id: saved.input_device_id.clone(),
             output_device_id: saved.output_device_id.clone(),
             push_to_talk_key: saved.push_to_talk_key.clone(),
+            noise_suppression: saved.noise_suppression.as_str(),
             volumes: saved.participant_volumes.clone(),
             locally_muted: saved.muted_participants.clone(),
             ..VoiceSnapshot::default()
@@ -380,6 +389,10 @@ impl VoiceHost {
         let ptt_key = saved.push_to_talk_key.filter(|_| saved.push_to_talk);
         keys.watch(ptt_key.as_ref().map(|k| k.code));
         engine.send(VoiceCommand::SetPushToTalk(ptt_key.is_some()));
+        // Before any room is joined, so building the Enhanced model never interrupts a call.
+        engine.send(VoiceCommand::SetNoiseSuppression(engine_mode(
+            saved.noise_suppression,
+        )));
         engine.send(VoiceCommand::RefreshDevices);
         Self {
             engine,
@@ -458,6 +471,13 @@ fn apply(state: &mut VoiceSnapshot, event: VoiceEvent) -> bool {
         VoiceEvent::MicrophoneMutedChanged(muted) => state.microphone_muted = muted,
         VoiceEvent::DeafenedChanged(deafened) => state.deafened = deafened,
         VoiceEvent::PushToTalkChanged(enabled) => state.push_to_talk = enabled,
+        VoiceEvent::NoiseSuppressionChanged(mode) => {
+            state.noise_suppression_active = match mode {
+                NoiseSuppression::Off => "off",
+                NoiseSuppression::Enhanced => "enhanced",
+                _ => "standard",
+            };
+        }
         // Volume and local mute are host preferences, updated by their commands; the engine's
         // confirmation carries the effective volume only.
         VoiceEvent::ParticipantVolumeChanged { .. } => return false,
@@ -813,6 +833,32 @@ pub fn voice_set_push_to_talk(
     host.update(|s| s.push_to_talk_key = key);
     let _ = app.emit(STATE_CHANGED, voice_get_state(host));
     Ok(())
+}
+
+/// Chooses microphone noise suppression (`off` | `standard` | `enhanced`). Saved for the next
+/// start and applied immediately; the snapshot's `noiseSuppressionActive` reports what runs.
+#[tauri::command]
+pub fn voice_set_noise_suppression(
+    app: AppHandle,
+    host: State<'_, VoiceHost>,
+    mode: String,
+) -> Result<(), CommandError> {
+    let choice = NoiseSuppressionChoice::parse(&mode).ok_or_else(|| {
+        CommandError::new("voice.invalid_argument", "unknown noise suppression mode")
+    })?;
+    host.settings.update(|s| s.noise_suppression = choice);
+    host.send(VoiceCommand::SetNoiseSuppression(engine_mode(choice)))?;
+    host.update(|s| s.noise_suppression = choice.as_str());
+    let _ = app.emit(STATE_CHANGED, voice_get_state(host));
+    Ok(())
+}
+
+fn engine_mode(choice: NoiseSuppressionChoice) -> NoiseSuppression {
+    match choice {
+        NoiseSuppressionChoice::Off => NoiseSuppression::Off,
+        NoiseSuppressionChoice::Standard => NoiseSuppression::Standard,
+        NoiseSuppressionChoice::Enhanced => NoiseSuppression::Enhanced,
+    }
 }
 
 #[tauri::command]

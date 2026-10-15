@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### New
+- Enhanced noise suppression, on by default: others no longer hear your keyboard, mouse clicks, fan or room, and your microphone stays silent between words. Choose Enhanced, Standard or Off under Settings → Audio.
+
 ### Fixed
 - The connection badge no longer says "Unstable" on a fast connection. Latency counts as unstable from 50 ms and poor from 100 ms, and a single audio hiccup on your own computer no longer changes the rating.
 
