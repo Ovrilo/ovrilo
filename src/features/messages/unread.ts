@@ -151,13 +151,15 @@ export function useMarkRead(channelId: string) {
     (messageId: number) => {
       if (messageId <= sent.current) return;
       sent.current = messageId;
-      updateUnread(queryClient, channelId, (list) =>
-        list.map((u) =>
+      let partial = false;
+      updateUnread(queryClient, channelId, (list) => {
+        partial = list.some((u) => u.channelId === channelId && messageId < (u.lastMessageId ?? 0) && u.unreadCount > 0);
+        return list.map((u) =>
           u.channelId === channelId && messageId > (u.lastReadMessageId ?? 0)
             ? { ...u, lastReadMessageId: messageId, unreadCount: messageId >= (u.lastMessageId ?? 0) ? 0 : u.unreadCount }
             : u,
-        ),
-      );
+        );
+      });
       void api
         .PUT("/channels/{channelId}/read-state", {
           params: { path: { channelId } },
@@ -166,6 +168,13 @@ export function useMarkRead(channelId: string) {
         .then(({ response }) => {
           // Not stored: allow a later attempt to send it again.
           if (!response.ok && sent.current === messageId) sent.current = 0;
+          // Read up to the middle: only the server knows how many are left.
+          else if (partial) {
+            void queryClient.invalidateQueries({
+              predicate: (q) =>
+                isUnreadQuery(q.queryKey) && !!(q.state.data as ChannelUnread[] | undefined)?.some((u) => u.channelId === channelId),
+            });
+          }
         })
         .catch(() => {
           if (sent.current === messageId) sent.current = 0;

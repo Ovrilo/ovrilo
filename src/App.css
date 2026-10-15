@@ -606,6 +606,55 @@ select:focus {
   white-space: nowrap;
 }
 
+/* Owners: a manage button on hover and drag to reorder within the group. */
+.channel-group li.manageable {
+  position: relative;
+}
+
+.channel-row-action {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+}
+
+.channel-group li.manageable:hover > .channel-row-action,
+.channel-row-action:focus-visible {
+  opacity: 1;
+}
+
+.channel-group li.manageable:hover > .channel-row {
+  padding-right: 32px;
+}
+
+.channel-group li.manageable:hover > .channel-row .unread-badge {
+  visibility: hidden;
+}
+
+.channel-group li.dragging {
+  opacity: 0.5;
+}
+
+.channel-group li.drop-before::before,
+.channel-group li.drop-after::after {
+  position: absolute;
+  right: var(--space-2);
+  left: var(--space-2);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+  content: "";
+  pointer-events: none;
+}
+
+.channel-group li.drop-before::before {
+  top: -1px;
+}
+
+.channel-group li.drop-after::after {
+  bottom: -1px;
+}
+
 .channel-row:hover:not(:disabled) {
   background: var(--surface-2);
   color: var(--text-primary);
@@ -1072,6 +1121,14 @@ button.small-button {
 
 .context-menu-item:hover:not(:disabled) {
   background: var(--surface-2);
+}
+
+.context-menu-danger {
+  color: var(--danger);
+}
+
+.context-menu-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
 }
 
 .context-menu-check {

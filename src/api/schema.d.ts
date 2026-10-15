@@ -254,7 +254,7 @@ export interface paths {
         /** Lists communities the caller is an active member of. */
         get: operations["ListMyCommunities"];
         put?: never;
-        /** Creates a private community owned by the caller. */
+        /** Creates a private community owned by the caller, with a text channel `general` and a voice channel `General`. */
         post: operations["CreateCommunity"];
         delete?: never;
         options?: never;
@@ -380,7 +380,7 @@ export interface paths {
         delete: operations["DeleteChannel"];
         options?: never;
         head?: never;
-        /** Renames, re-topics or repositions a channel. Requires ManageChannels. */
+        /** Renames, re-topics or moves a channel. Position is its zero-based place among channels of its type; the others shift. Requires ManageChannels. */
         patch: operations["UpdateChannel"];
         trace?: never;
     };

@@ -2,6 +2,24 @@
 
 User-facing changes to the Ovrilo desktop app. Each release's notes are taken from its section here by the release workflow, so write for the people who use the app, not for developers.
 
+## [0.5.0] - 2026-10-15
+
+Communities that are ready to use, and channels you can manage. Some of this needs your server to be updated as well.
+
+### New
+- New communities start with a #general text channel and a General voice channel.
+- Owners can rename channels, give text channels a topic, reorder channels by dragging them (or with Move up/down) and delete them. Right-click a channel or use its gear button.
+- Channel changes show up for everyone right away.
+- Opening a community opens its first text channel, and each community remembers the channel you had open.
+
+### Changed
+- A channel with unread messages opens at the red "New" line instead of the newest message. Scrolling part of the way down marks that part as read.
+- Joining a community no longer marks its whole history as unread.
+
+### Fixed
+- The + next to Text creates a text channel (it used to preselect Voice).
+- If a voice channel you are in is deleted, you leave it.
+
 ## [0.4.1] - 2026-10-15
 
 ### Fixed

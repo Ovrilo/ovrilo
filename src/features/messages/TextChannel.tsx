@@ -43,6 +43,12 @@ function dayLabel(iso: string): string {
 /** Reports read positions this long after the view settles, not on every incoming message. */
 const MARK_READ_DELAY_MS = 750;
 
+/** Older pages loaded at most to reach the first unread message when a channel opens. */
+const UNREAD_SEARCH_PAGES = 4;
+
+/** Context kept above the "New" line when a channel opens there. */
+const UNREAD_TOP_MARGIN = 24;
+
 /** True while the window is visible and focused: only then has the person actually seen new messages. */
 function useWindowAttention(): boolean {
   const read = () => document.visibilityState === "visible" && document.hasFocus();
@@ -78,17 +84,37 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
   const unread = useUnread(channel.communityId).data?.find((u) => u.channelId === channel.id);
   // Where reading stopped when the channel was opened; the "New" line stays there while it is open.
   const [openedAt, setOpenedAt] = useState<{ lastRead: number; count: number } | null>(null);
+  // The view has been placed at the first unread message (or the newest); reading counts from then.
+  const [positioned, setPositioned] = useState(false);
+  const olderPagesLoaded = useRef(0);
+  const readTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!openedAt && unread) setOpenedAt({ lastRead: unread.lastReadMessageId ?? 0, count: unread.unreadCount });
   }, [openedAt, unread]);
 
+  useEffect(() => () => clearTimeout(readTimer.current), []);
+
   // Seen = scrolled to the newest message while the window has attention.
   useEffect(() => {
-    if (!following || !attentive || newestId === undefined || !openedAt) return;
+    if (!following || !attentive || newestId === undefined || !positioned) return;
     const timer = setTimeout(() => markRead(newestId), MARK_READ_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [following, attentive, newestId, openedAt, markRead]);
+  }, [following, attentive, newestId, positioned, markRead]);
+
+  /** Reading above the newest message: everything down to the last message fully in view is seen. */
+  const markVisibleRead = () => {
+    const element = scroller.current;
+    if (!element || !positioned || !document.hasFocus()) return;
+    const bottom = element.getBoundingClientRect().bottom;
+    const items = element.querySelectorAll<HTMLElement>("li[data-message-id]");
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (items[i].getBoundingClientRect().bottom <= bottom + 1) {
+        markRead(Number(items[i].dataset.messageId));
+        return;
+      }
+    }
+  };
 
   // Keep the view pinned to the bottom for new messages, and keep the reading position when older
   // messages are added above.
@@ -103,6 +129,39 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
     }
     anchor.current = { firstId, height: element.scrollHeight };
   }, [chat.messages, chat.pending]);
+
+  // What is on screen at the "New" line counts as seen once the window has attention.
+  useEffect(() => {
+    if (!positioned || !attentive || atBottom.current) return;
+    readTimer.current = setTimeout(markVisibleRead, MARK_READ_DELAY_MS);
+    return () => clearTimeout(readTimer.current);
+  }, [positioned, attentive]);
+
+  // Open at the first unread message: load older pages until it is in the history (a few at most),
+  // then put the "New" line near the top. Without unread messages the view stays at the newest.
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (positioned || !element || !openedAt || chat.isLoading || chat.isError) return;
+    if (openedAt.count > 0) {
+      const oldest = chat.messages[0]?.id;
+      const reached = oldest !== undefined && oldest <= openedAt.lastRead;
+      if (!reached && chat.hasOlder && olderPagesLoaded.current < UNREAD_SEARCH_PAGES) {
+        if (!chat.loadingOlder) {
+          olderPagesLoaded.current += 1;
+          chat.loadOlder();
+        }
+        return;
+      }
+      const divider = element.querySelector<HTMLElement>(".unread-divider");
+      if (divider) {
+        const offset = divider.getBoundingClientRect().top - element.getBoundingClientRect().top;
+        element.scrollTop += offset - UNREAD_TOP_MARGIN;
+        atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < STICK_THRESHOLD;
+        setFollowing(atBottom.current);
+      }
+    }
+    setPositioned(true);
+  }, [positioned, openedAt, chat]);
 
   // Size changes without a scroll (the cooldown notice, a growing composer, pending messages turning
   // into stored ones, a resized window) must not unpin a reader who is at the bottom.
@@ -163,6 +222,8 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
           atBottom.current = distance < STICK_THRESHOLD;
           setFollowing(atBottom.current);
           setFarFromBottom(distance > el.clientHeight);
+          clearTimeout(readTimer.current);
+          if (!atBottom.current) readTimer.current = setTimeout(markVisibleRead, MARK_READ_DELAY_MS);
         }}
       >
         <div className="message-stack">
@@ -258,7 +319,7 @@ function MessageItem({
   const name = message.author.displayName ?? "Deleted user";
 
   return (
-    <li className={`message avatar-hover-scope${continued ? " continued" : ""}`}>
+    <li className={`message avatar-hover-scope${continued ? " continued" : ""}`} data-message-id={message.id}>
       {continued ? (
         <time className="message-gutter-time" dateTime={message.createdAt} title={formatTime(message.createdAt)}>
           {timeFormat.format(new Date(message.createdAt))}
