@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 
 const FILE_NAME: &str = "settings.json";
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// Bumped when a stored value must be changed once on load (see `migrate`).
+const SETTINGS_VERSION: u16 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DesktopSettings {
     pub input_device_id: Option<String>,
@@ -22,11 +25,32 @@ pub struct DesktopSettings {
     pub participant_volumes: BTreeMap<String, u16>,
     /// Users muted for this client only (their volume is kept for unmuting).
     pub muted_participants: BTreeSet<String>,
-    /// Microphone noise suppression (ADR-0018). Missing in older files: Enhanced.
+    /// Microphone noise suppression (ADR-0018). Missing in older files: Standard.
     pub noise_suppression: NoiseSuppressionChoice,
     /// Master volumes in percent (0–200, 100 = unchanged).
     pub input_volume: Volume,
     pub output_volume: Volume,
+    /// Which one-time migrations the file has been through. Missing (0) in files from 0.7.0 and
+    /// older; new settings start at the current version.
+    #[serde(default)]
+    pub version: u16,
+}
+
+impl Default for DesktopSettings {
+    fn default() -> Self {
+        Self {
+            input_device_id: None,
+            output_device_id: None,
+            push_to_talk: false,
+            push_to_talk_key: None,
+            participant_volumes: BTreeMap::new(),
+            muted_participants: BTreeSet::new(),
+            noise_suppression: NoiseSuppressionChoice::default(),
+            input_volume: Volume::default(),
+            output_volume: Volume::default(),
+            version: SETTINGS_VERSION,
+        }
+    }
 }
 
 /// A volume in percent; 100 when missing from older files.
@@ -45,8 +69,8 @@ impl Default for Volume {
 #[serde(rename_all = "camelCase")]
 pub enum NoiseSuppressionChoice {
     Off,
-    Standard,
     #[default]
+    Standard,
     Enhanced,
 }
 
@@ -109,6 +133,7 @@ impl SettingsStore {
             .and_then(|text| serde_json::from_str::<DesktopSettings>(&text).ok())
             .map(sanitize)
             .unwrap_or_default();
+        let current = migrate(current);
         Self {
             path,
             current: Mutex::new(current),
@@ -140,6 +165,19 @@ impl SettingsStore {
         }
         current.clone()
     }
+}
+
+/// One-time changes to files written by older versions. The new version is saved with the next change.
+fn migrate(mut settings: DesktopSettings) -> DesktopSettings {
+    if settings.version < 1 {
+        // 0.7.0 made Enhanced the default, and it cut speech too often; files still on it move to
+        // Standard once. Choosing Enhanced again afterwards is kept.
+        if settings.noise_suppression == NoiseSuppressionChoice::Enhanced {
+            settings.noise_suppression = NoiseSuppressionChoice::Standard;
+        }
+    }
+    settings.version = SETTINGS_VERSION;
+    settings
 }
 
 /// Drops values a hand-edited or older file could carry that the app would reject.
@@ -225,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn noise_suppression_defaults_to_enhanced_and_is_remembered() {
+    fn noise_suppression_defaults_to_standard_and_is_remembered() {
         let dir = temp_dir("noise");
         fs::create_dir_all(&dir).unwrap();
         // A file written before the setting existed.
@@ -233,20 +271,51 @@ mod tests {
         let store = SettingsStore::load(Some(dir.clone()));
         assert_eq!(
             store.get().noise_suppression,
-            NoiseSuppressionChoice::Enhanced
+            NoiseSuppressionChoice::Standard
         );
 
-        store.update(|s| s.noise_suppression = NoiseSuppressionChoice::Standard);
+        store.update(|s| s.noise_suppression = NoiseSuppressionChoice::Enhanced);
         let reloaded = SettingsStore::load(Some(dir.clone()));
         assert_eq!(
             reloaded.get().noise_suppression,
-            NoiseSuppressionChoice::Standard
+            NoiseSuppressionChoice::Enhanced,
+            "choosing Enhanced after the migration is kept"
         );
         assert_eq!(
             NoiseSuppressionChoice::parse("off"),
             Some(NoiseSuppressionChoice::Off)
         );
         assert_eq!(NoiseSuppressionChoice::parse("ultra"), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn enhanced_from_0_7_0_moves_to_standard_once() {
+        let dir = temp_dir("noise-migration");
+        fs::create_dir_all(&dir).unwrap();
+        // 0.7.0 saved its Enhanced default with every change, without a version.
+        fs::write(
+            dir.join(FILE_NAME),
+            r#"{"noiseSuppression":"enhanced","inputVolume":120}"#,
+        )
+        .unwrap();
+        let store = SettingsStore::load(Some(dir.clone()));
+        let settings = store.get();
+        assert_eq!(settings.noise_suppression, NoiseSuppressionChoice::Standard);
+        assert_eq!(
+            settings.input_volume,
+            Volume(120),
+            "other settings are kept"
+        );
+
+        // Off is a deliberate choice and stays.
+        fs::write(dir.join(FILE_NAME), r#"{"noiseSuppression":"off"}"#).unwrap();
+        assert_eq!(
+            SettingsStore::load(Some(dir.clone()))
+                .get()
+                .noise_suppression,
+            NoiseSuppressionChoice::Off
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -114,7 +114,7 @@ const initialSnapshot: VoiceSnapshot = {
   pushToTalk: false,
   pushToTalkKey: null,
   transmitting: true,
-  noiseSuppression: "enhanced",
+  noiseSuppression: "standard",
   noiseSuppressionActive: "standard",
   inputVolume: 100,
   outputVolume: 100,
