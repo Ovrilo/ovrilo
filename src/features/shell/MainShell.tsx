@@ -1,11 +1,13 @@
-import { ChevronDown, HeadphoneOff, Hash, LogIn, MicOff, Plus, Settings, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, Phone, HeadphoneOff, Hash, LogIn, MicOff, Plus, Settings, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { Schemas } from "../../api/client";
-import { useApi } from "../../auth/SessionContext";
+import { useApi, useRealtime } from "../../auth/SessionContext";
 import { Avatar, CommunityIcon, IconButton } from "../../components/ui";
+import { useCallActions, useCallState } from "../friends/calls";
 import { type DirectConversation, useDirectMessages, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
+import { IncomingCall, type IncomingCallInfo } from "../friends/IncomingCall";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
 import { FriendsView } from "../friends/FriendsView";
 import { TextChannel } from "../messages/TextChannel";
@@ -77,6 +79,41 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const openDm = directMessages.data?.find((c) => c.id === dmId) ?? null;
   const messageFriend = (userId: string) =>
     openDirectMessage.mutate(userId, { onSuccess: (conversation) => setDmId(conversation.id) });
+
+  // Calls in direct conversations.
+  const realtime = useRealtime();
+  const calls = useCallActions();
+  const callState = useCallState(home && openDm ? openDm.id : null);
+  const callParticipants = callState.data?.participantIds.length ?? 0;
+  const [incoming, setIncoming] = useState<IncomingCallInfo | null>(null);
+  const [callNotice, setCallNotice] = useState<{ conversationId: string; text: string } | null>(null);
+  const inCall = (conversationId: string) => connectedChannelId === conversationId;
+  const inCallRef = useRef(inCall);
+  inCallRef.current = inCall;
+  const connectCall = (conversation: { id: string; name: string }, answer: boolean) => {
+    setCallNotice(null);
+    setConnectedChannel({ id: conversation.id, name: conversation.name, communityId: "", call: true });
+    calls.connect.mutate({ conversationId: conversation.id, answer });
+  };
+  useEffect(() => {
+    const offs = [
+      realtime.on("CallRinging", (ring) => {
+        if (!inCallRef.current(ring.conversationId)) setIncoming(ring);
+      }),
+      realtime.on("CallAccepted", ({ conversationId }) =>
+        setIncoming((current) => (current?.conversationId === conversationId ? null : current)),
+      ),
+      realtime.on("CallEnded", ({ conversationId, reason }) => {
+        setIncoming((current) => (current?.conversationId === conversationId ? null : current));
+        // Our call was not answered: leave the empty room and say why.
+        if (inCallRef.current(conversationId) && reason !== "cancelled") {
+          void voice.leave();
+          setCallNotice({ conversationId, text: reason === "declined" ? "Call declined." : "No answer." });
+        }
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [realtime]);
   const { snapshot } = useVoice();
   const join = useJoinVoice();
   useProfileUpdates(user.id);
@@ -100,11 +137,13 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   useEffect(() => {
     void queryClient.invalidateQueries({ queryKey: ["communities"], predicate: (q) => q.queryKey[2] === "voice-states" });
   }, [connectedChannelId, snapshot.connection, queryClient]);
-  const [connectedChannel, setConnectedChannel] = useState<{ id: string; name: string; communityId: string } | null>(
-    null,
-  );
-  const connectedAvatars = useMemberAvatars(connectedChannel?.communityId ?? null);
-  const connectedCommunityId = connectedChannelId && connectedChannel?.id === connectedChannelId ? connectedChannel.communityId : null;
+  // The room the engine joined: a voice channel, or a direct-message call (`call`, no community).
+  const [connectedChannel, setConnectedChannel] = useState<
+    { id: string; name: string; communityId: string; call?: boolean } | null
+  >(null);
+  const connectedAvatars = useMemberAvatars(connectedChannel?.communityId || null);
+  const connectedCommunityId =
+    connectedChannelId && connectedChannel?.id === connectedChannelId ? connectedChannel.communityId || null : null;
   useChannelUpdates(communities.data?.map((c) => c.id) ?? [], connectedChannelId, connectedCommunityId);
   const connectedName =
     connectedChannel?.id === connectedChannelId ? connectedChannel?.name ?? "Voice channel" : "Voice channel";
@@ -307,9 +346,14 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <div className="sidebar-footer">
           <UpdateBanner />
           <VoiceDock
-            channelName={connectedName}
+            channelName={
+              connectedChannel?.call && connectedChannel.id === connectedChannelId ? `Call with ${connectedName}` : connectedName
+            }
             onOpen={() => {
-              if (connectedChannel) {
+              if (connectedChannel?.call) {
+                setHome(true);
+                setDmId(connectedChannel.id);
+              } else if (connectedChannel) {
                 setSelectedCommunityId(connectedChannel.communityId);
                 selectChannel(connectedChannel);
               }
@@ -326,7 +370,60 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               <Avatar name={openDm.user.displayName} assetId={openDm.user.avatarAssetId} size="xs" />
               <h1>{openDm.user.displayName}</h1>
               <span className="muted channel-topic">@{openDm.user.username}</span>
+              {voiceAvailable && !inCall(openDm.id) && (
+                <IconButton
+                  icon={Phone}
+                  label={callParticipants > 0 ? "Join the call" : `Call ${openDm.user.displayName}`}
+                  className="channel-header-action"
+                  disabled={calls.connect.isPending}
+                  onClick={() =>
+                    connectCall(
+                      { id: openDm.id, name: openDm.user.displayName },
+                      callParticipants > 0 || callState.data?.ringingFrom === openDm.user.id,
+                    )
+                  }
+                />
+              )}
             </header>
+            {(inCall(openDm.id) || callParticipants > 0) && (
+              <div className="dm-call">
+                {inCall(openDm.id) && callState.data?.ringingFrom === user.id && snapshot.participants.length === 0 && (
+                  <p className="dm-call-status" role="status">
+                    Calling {openDm.user.displayName}…{" "}
+                    <button
+                      className="link"
+                      onClick={() => {
+                        calls.decline.mutate(openDm.id);
+                        void voice.leave();
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </p>
+                )}
+                <VoiceRoom
+                  key={`call-${openDm.id}`}
+                  channel={{ id: openDm.id, name: openDm.user.displayName, communityId: "" }}
+                  call={{
+                    other: openDm.user,
+                    ringingFrom: callState.data?.ringingFrom ?? null,
+                    occupied: callParticipants > 0,
+                  }}
+                  user={user}
+                  otherChannelName={connectedChannelId && connectedChannelId !== openDm.id ? connectedName : null}
+                  join={{
+                    mutate: () => connectCall({ id: openDm.id, name: openDm.user.displayName }, true),
+                    isPending: calls.connect.isPending,
+                    error: calls.connect.error,
+                  }}
+                />
+              </div>
+            )}
+            {callNotice?.conversationId === openDm.id && (
+              <p className="dm-call-status muted" role="status">
+                {callNotice.text}
+              </p>
+            )}
             <TextChannel
               key={openDm.id}
               channel={{ id: openDm.id, name: openDm.user.displayName, communityId: "" }}
@@ -390,6 +487,23 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
           </div>
         )}
       </main>
+
+      {incoming && (
+        <IncomingCall
+          call={incoming}
+          busy={calls.connect.isPending}
+          onAccept={() => {
+            setIncoming(null);
+            setHome(true);
+            setDmId(incoming.conversationId);
+            connectCall({ id: incoming.conversationId, name: incoming.caller.displayName }, true);
+          }}
+          onDecline={() => {
+            calls.decline.mutate(incoming.conversationId);
+            setIncoming(null);
+          }}
+        />
+      )}
 
       {dialog === "createCommunity" && (
         <CreateCommunityDialog onClose={() => setDialog(null)} onCreated={selectCommunity} />
