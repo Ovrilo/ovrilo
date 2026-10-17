@@ -4,6 +4,7 @@ import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useLayoutEffec
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
 import { useBlocks } from "../friends/friends";
+import { InviteCard, inviteCode, withoutInviteLink } from "../friends/invites";
 import { blockedRuns, groupRows, type Message } from "./history";
 import { sendThrottle } from "./throttle";
 import { type PendingMessage, useChannelMessages } from "./useChannelMessages";
@@ -360,6 +361,8 @@ function MessageItem({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = message.author.displayName ?? "Deleted user";
+  const invite = inviteCode(message.content);
+  const text = invite && message.content ? withoutInviteLink(message.content) : message.content;
 
   return (
     <li className={`message avatar-hover-scope${continued ? " continued" : ""}`} data-message-id={message.id}>
@@ -394,10 +397,15 @@ function MessageItem({
             }}
           />
         ) : (
-          <p className="message-text">
-            {message.content}
-            {message.editedAt && <span className="message-edited muted"> (edited)</span>}
-          </p>
+          <>
+            {text && (
+              <p className="message-text">
+                {text}
+                {message.editedAt && <span className="message-edited muted"> (edited)</span>}
+              </p>
+            )}
+            {invite && <InviteCard code={invite} own={own} />}
+          </>
         )}
         {error && <p className="form-error small">{error}</p>}
       </div>

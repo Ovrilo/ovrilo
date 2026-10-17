@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Shows the community a usable invitation leads to, without using it. The code goes in the body. */
+        post: operations["PreviewInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitations/accept": {
         parameters: {
             query?: never;
@@ -981,6 +998,18 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        InvitationPreviewResponse: {
+            /** Format: uuid */
+            communityId: string;
+            name: string;
+            /** Format: uuid */
+            iconAssetId: null | string;
+            /** Format: int32 */
+            memberCount: number;
+            alreadyMember: boolean;
+            /** Format: date-time */
+            expiresAt: string;
+        };
         InvitationResponse: {
             /** Format: uuid */
             id: string;
@@ -1059,6 +1088,9 @@ export interface components {
         OpenDirectMessageRequest: {
             /** Format: uuid */
             userId: string;
+        };
+        PreviewInvitationRequest: {
+            code: string;
         };
         ProblemDetails: {
             type?: null | string;
@@ -1290,6 +1322,64 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PreviewInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreviewResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
         };
     };

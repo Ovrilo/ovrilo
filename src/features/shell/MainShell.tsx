@@ -24,6 +24,7 @@ import { useCallActions, useCallState } from "../friends/calls";
 import { type Conversation, GROUP_MAX_MEMBERS, type GroupConversation, useConversations, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
 import { AddToGroupDialog, CreateGroupDialog, LeaveGroupDialog, RenameGroupDialog } from "../friends/GroupDialogs";
 import { GroupAvatar, GroupMembersPanel } from "../friends/GroupParts";
+import { OpenCommunityContext } from "../friends/invites";
 import { IncomingCall, type IncomingCallInfo } from "../friends/IncomingCall";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
 import { FriendsView } from "../friends/FriendsView";
@@ -215,7 +216,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       }
     : undefined;
 
-  return (
+  const shell = (
     <div className="app-shell">
       <nav className="space-rail" aria-label="Communities">
         <button
@@ -611,7 +612,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <CreateCommunityDialog onClose={() => setDialog(null)} onCreated={selectCommunity} />
       )}
       {dialog === "joinCommunity" && <JoinCommunityDialog onClose={() => setDialog(null)} onJoined={selectCommunity} />}
-      {dialog === "invite" && community && <InviteDialog communityId={community.id} onClose={() => setDialog(null)} />}
+      {dialog === "invite" && community && <InviteDialog community={community} onClose={() => setDialog(null)} />}
       {typeof dialog === "object" && dialog?.kind === "createChannel" && community && (
         <CreateChannelDialog communityId={community.id} type={dialog.type} onClose={() => setDialog(null)} />
       )}
@@ -679,6 +680,8 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       )}
     </div>
   );
+  // Invitation cards in messages open the community they joined.
+  return <OpenCommunityContext.Provider value={selectCommunity}>{shell}</OpenCommunityContext.Provider>;
 }
 
 /**

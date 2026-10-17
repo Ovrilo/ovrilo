@@ -6,9 +6,11 @@ import { problemMessage, type Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 import { Dialog } from "../../components/Dialog";
 import { PicturePicker } from "../../components/PicturePicker";
-import { CommunityIcon, Select } from "../../components/ui";
+import { Avatar, CommunityIcon, Select } from "../../components/ui";
+import { useFriends } from "../friends/friends";
+import { useInviteFriend } from "../friends/invites";
 import { uploadImage } from "../../media/upload";
-import { dropCommunity, queryKeys } from "./queries";
+import { dropCommunity, queryKeys, useMembers } from "./queries";
 
 interface DialogProps {
   onClose: () => void;
@@ -259,7 +261,8 @@ export function JoinCommunityDialog({ onClose, onJoined }: DialogProps & { onJoi
   );
 }
 
-export function InviteDialog({ onClose, communityId }: DialogProps & { communityId: string }) {
+export function InviteDialog({ onClose, community }: DialogProps & { community: { id: string; name: string } }) {
+  const communityId = community.id;
   const api = useApi();
   const [copied, setCopied] = useState(false);
   const mutation = useMutation({
@@ -275,6 +278,8 @@ export function InviteDialog({ onClose, communityId }: DialogProps & { community
 
   return (
     <Dialog title="Invite friends" onClose={onClose}>
+      <InviteFriendsList community={community} />
+      <h3 className="dialog-subheading">Or share a code</h3>
       {invitation ? (
         <>
           <p className="muted">
@@ -319,6 +324,68 @@ export function InviteDialog({ onClose, communityId }: DialogProps & { community
         </form>
       )}
     </Dialog>
+  );
+}
+
+/** Your friends, each with an Invite button that sends a single-use invitation to your direct messages. */
+function InviteFriendsList({ community }: { community: { id: string; name: string } }) {
+  const friends = useFriends();
+  const members = useMembers(community.id);
+  const invite = useInviteFriend(community);
+  const [sent, setSent] = useState<ReadonlySet<string>>(() => new Set());
+  const [filter, setFilter] = useState("");
+  const memberIds = new Set((members.data ?? []).map((m) => m.userId));
+  const query = filter.trim().toLowerCase();
+  const list = (friends.data ?? [])
+    .map((f) => f.user)
+    .filter((u) => !query || u.displayName.toLowerCase().includes(query) || u.username.toLowerCase().includes(query))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }));
+
+  if (friends.isPending) return <p className="muted small">Loading friends…</p>;
+  if ((friends.data ?? []).length === 0) {
+    return <p className="muted small">Add friends from the Friends page to invite them here with one click.</p>;
+  }
+  return (
+    <div className="invite-friends">
+      <input
+        type="search"
+        placeholder="Find a friend"
+        aria-label="Find a friend"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+        autoFocus
+      />
+      <ul className="invite-friends-list" aria-label="Friends">
+        {list.map((u) => {
+          const member = memberIds.has(u.id);
+          const done = sent.has(u.id);
+          const busy = invite.isPending && invite.variables === u.id;
+          return (
+            <li key={u.id} className="invite-friend-row">
+              <Avatar name={u.displayName} assetId={u.avatarAssetId} size="xs" />
+              <span className="invite-friend-name">
+                {u.displayName} <span className="muted small">@{u.username}</span>
+              </span>
+              {member ? (
+                <span className="muted small">Member</span>
+              ) : (
+                <button
+                  type="button"
+                  className={done ? undefined : "primary"}
+                  disabled={done || busy}
+                  onClick={() => invite.mutate(u.id, { onSuccess: () => setSent((s) => new Set(s).add(u.id)) })}
+                >
+                  {done ? "Sent" : busy ? "Sending…" : "Invite"}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <FormError error={invite.error} />
+    </div>
   );
 }
 
