@@ -1,4 +1,19 @@
-import { ChevronDown, Phone, HeadphoneOff, Hash, LogIn, MicOff, Plus, Settings, UserPlus, Users, Volume2, VolumeX } from "lucide-react";
+import {
+  ChevronDown,
+  Phone,
+  HeadphoneOff,
+  Hash,
+  LogIn,
+  LogOut,
+  MicOff,
+  Pencil,
+  Plus,
+  Settings,
+  UserPlus,
+  Users,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -6,7 +21,9 @@ import type { Schemas } from "../../api/client";
 import { useApi, useRealtime } from "../../auth/SessionContext";
 import { Avatar, CommunityIcon, IconButton } from "../../components/ui";
 import { useCallActions, useCallState } from "../friends/calls";
-import { type DirectConversation, useDirectMessages, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
+import { type Conversation, GROUP_MAX_MEMBERS, type GroupConversation, useConversations, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
+import { AddToGroupDialog, CreateGroupDialog, LeaveGroupDialog, RenameGroupDialog } from "../friends/GroupDialogs";
+import { GroupAvatar, GroupMembersPanel } from "../friends/GroupParts";
 import { IncomingCall, type IncomingCallInfo } from "../friends/IncomingCall";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
 import { FriendsView } from "../friends/FriendsView";
@@ -52,6 +69,9 @@ type OpenDialog =
   | "settings"
   | { kind: "createChannel"; type: Channel["type"] }
   | { kind: "editChannel" | "deleteChannel"; channel: Channel }
+  | { kind: "createGroup" }
+  | { kind: "addToGroup" | "renameGroup"; group: GroupConversation }
+  | { kind: "leaveGroup"; conversation: Conversation; userId: string; userName: string }
   | null;
 
 export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
@@ -72,11 +92,12 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   useDirectMessagesSync();
   useMuteBlockedInVoice();
   const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
-  const directMessages = useDirectMessages();
+  const conversations = useConversations(user.id);
   const openDirectMessage = useOpenDirectMessage();
-  const unreadDirect = directMessages.data?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
+  const unreadDirect = conversations.data?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
   const homeBadge = incomingRequests + unreadDirect;
-  const openDm = directMessages.data?.find((c) => c.id === dmId) ?? null;
+  const openDm = conversations.data?.find((c) => c.id === dmId) ?? null;
+  const openGroup = openDm?.group ?? null;
   const messageFriend = (userId: string) =>
     openDirectMessage.mutate(userId, { onSuccess: (conversation) => setDmId(conversation.id) });
 
@@ -247,7 +268,12 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                 <span>Friends</span>
                 {incomingRequests > 0 && <span className="unread-badge">{unreadLabel(incomingRequests)}</span>}
               </button>
-              <DirectMessageList conversations={directMessages.data ?? []} selectedId={dmId} onSelect={setDmId} />
+              <DirectMessageList
+                conversations={conversations.data ?? []}
+                selectedId={dmId}
+                onSelect={setDmId}
+                onCreateGroup={() => setDialog({ kind: "createGroup" })}
+              />
             </div>
           </>
         ) : community ? (
@@ -367,29 +393,78 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         {home && openDm ? (
           <>
             <header className="channel-header">
-              <Avatar name={openDm.user.displayName} assetId={openDm.user.avatarAssetId} size="xs" />
-              <h1>{openDm.user.displayName}</h1>
-              <span className="muted channel-topic">@{openDm.user.username}</span>
-              {voiceAvailable && !inCall(openDm.id) && (
+              {openGroup ? (
+                <>
+                  <GroupAvatar others={openDm.others} />
+                  <h1>
+                    <button
+                      className="group-title-button"
+                      title="Rename group"
+                      onClick={() => setDialog({ kind: "renameGroup", group: openGroup })}
+                    >
+                      {openDm.title}
+                      <Pencil size={13} aria-hidden="true" />
+                    </button>
+                  </h1>
+                  <span className="muted channel-topic">
+                    {openGroup.members.length} {openGroup.members.length === 1 ? "member" : "members"}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Avatar name={openDm.title} assetId={openDm.others[0]?.avatarAssetId ?? null} size="xs" />
+                  <h1>{openDm.title}</h1>
+                  <span className="muted channel-topic">@{openDm.others[0]?.username}</span>
+                </>
+              )}
+              {voiceAvailable && !inCall(openDm.id) && openDm.others.length > 0 && (
                 <IconButton
                   icon={Phone}
-                  label={callParticipants > 0 ? "Join the call" : `Call ${openDm.user.displayName}`}
+                  label={callParticipants > 0 ? "Join the call" : `Call ${openDm.title}`}
                   className="channel-header-action"
                   disabled={calls.connect.isPending}
                   onClick={() =>
                     connectCall(
-                      { id: openDm.id, name: openDm.user.displayName },
-                      callParticipants > 0 || callState.data?.ringingFrom === openDm.user.id,
+                      { id: openDm.id, name: openDm.title },
+                      callParticipants > 0 || (callState.data?.ringingIds ?? []).includes(user.id),
                     )
                   }
                 />
+              )}
+              {openGroup && (
+                <>
+                  <IconButton
+                    icon={UserPlus}
+                    label={openGroup.members.length >= GROUP_MAX_MEMBERS ? "This group is full" : "Add friends"}
+                    className={voiceAvailable && !inCall(openDm.id) ? undefined : "channel-header-action"}
+                    disabled={openGroup.members.length >= GROUP_MAX_MEMBERS}
+                    onClick={() => setDialog({ kind: "addToGroup", group: openGroup })}
+                  />
+                  <IconButton
+                    icon={Users}
+                    label={showMembers ? "Hide member list" : "Show member list"}
+                    tone={showMembers ? "active" : "default"}
+                    aria-pressed={showMembers}
+                    onClick={() => {
+                      setShowMembers(!showMembers);
+                      writeShowMembers(!showMembers);
+                    }}
+                  />
+                  <IconButton
+                    icon={LogOut}
+                    label="Leave group"
+                    onClick={() =>
+                      setDialog({ kind: "leaveGroup", conversation: openDm, userId: user.id, userName: user.displayName })
+                    }
+                  />
+                </>
               )}
             </header>
             {(inCall(openDm.id) || callParticipants > 0) && (
               <div className="dm-call">
                 {inCall(openDm.id) && callState.data?.ringingFrom === user.id && snapshot.participants.length === 0 && (
                   <p className="dm-call-status" role="status">
-                    Calling {openDm.user.displayName}…{" "}
+                    Calling {openDm.title}…{" "}
                     <button
                       className="link"
                       onClick={() => {
@@ -403,16 +478,17 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                 )}
                 <VoiceRoom
                   key={`call-${openDm.id}`}
-                  channel={{ id: openDm.id, name: openDm.user.displayName, communityId: "" }}
+                  channel={{ id: openDm.id, name: openDm.title, communityId: "" }}
                   call={{
-                    other: openDm.user,
+                    others: openDm.others,
+                    title: openDm.title,
                     ringingFrom: callState.data?.ringingFrom ?? null,
                     occupied: callParticipants > 0,
                   }}
                   user={user}
                   otherChannelName={connectedChannelId && connectedChannelId !== openDm.id ? connectedName : null}
                   join={{
-                    mutate: () => connectCall({ id: openDm.id, name: openDm.user.displayName }, true),
+                    mutate: () => connectCall({ id: openDm.id, name: openDm.title }, true),
                     isPending: calls.connect.isPending,
                     error: calls.connect.error,
                   }}
@@ -424,13 +500,38 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                 {callNotice.text}
               </p>
             )}
-            <TextChannel
-              key={openDm.id}
-              channel={{ id: openDm.id, name: openDm.user.displayName, communityId: "" }}
-              user={user}
-              canModerate={false}
-              direct={{ unread: dmUnread(openDm), with: openDm.user }}
-            />
+            <div className="channel-body">
+              <TextChannel
+                key={openDm.id}
+                channel={{ id: openDm.id, name: openDm.title, communityId: "" }}
+                user={user}
+                canModerate={false}
+                direct={{
+                  unread: dmUnread(openDm),
+                  group: openGroup !== null,
+                  picture: openGroup ? (
+                    <GroupAvatar others={openDm.others} size="lg" />
+                  ) : (
+                    <Avatar name={openDm.title} assetId={openDm.others[0]?.avatarAssetId ?? null} size="lg" />
+                  ),
+                  intro: openGroup
+                    ? `This is the beginning of the ${openDm.title} group.`
+                    : `This is the beginning of your direct messages with ${openDm.title}.`,
+                }}
+              />
+              {openGroup && showMembers && (
+                <GroupMembersPanel
+                  group={openGroup}
+                  selfId={user.id}
+                  onRemove={
+                    openGroup.ownerId === user.id
+                      ? (member) =>
+                          setDialog({ kind: "leaveGroup", conversation: openDm, userId: member.id, userName: member.displayName })
+                      : undefined
+                  }
+                />
+              )}
+            </div>
           </>
         ) : home ? (
           <FriendsView onMessage={messageFriend} />
@@ -496,7 +597,8 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             setIncoming(null);
             setHome(true);
             setDmId(incoming.conversationId);
-            connectCall({ id: incoming.conversationId, name: incoming.caller.displayName }, true);
+            const known = conversations.data?.find((c) => c.id === incoming.conversationId);
+            connectCall({ id: incoming.conversationId, name: known?.title ?? incoming.groupName ?? incoming.caller.displayName }, true);
           }}
           onDecline={() => {
             calls.decline.mutate(incoming.conversationId);
@@ -540,6 +642,28 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
           anchor={communityMenu.anchor}
           onAction={onCommunityAction}
           onClose={() => setCommunityMenu(null)}
+        />
+      )}
+      {typeof dialog === "object" && dialog?.kind === "createGroup" && (
+        <CreateGroupDialog onClose={() => setDialog(null)} onCreated={(id) => setDmId(id)} />
+      )}
+      {typeof dialog === "object" && dialog?.kind === "addToGroup" && (
+        <AddToGroupDialog group={dialog.group} onClose={() => setDialog(null)} />
+      )}
+      {typeof dialog === "object" && dialog?.kind === "renameGroup" && (
+        <RenameGroupDialog group={dialog.group} onClose={() => setDialog(null)} />
+      )}
+      {typeof dialog === "object" && dialog?.kind === "leaveGroup" && (
+        <LeaveGroupDialog
+          conversation={dialog.conversation}
+          selfId={user.id}
+          userId={dialog.userId}
+          userName={dialog.userName}
+          onClose={() => setDialog(null)}
+          onLeft={() => {
+            if (connectedChannelId === dialog.conversation.id) void voice.leave();
+            setDmId(null);
+          }}
         />
       )}
       {dialog === "settings" && <SettingsDialog user={user} onClose={() => setDialog(null)} />}
@@ -756,8 +880,8 @@ function writeShowMembers(value: boolean) {
   }
 }
 
-/** A direct conversation's unread state in the shape text views use for channels. */
-function dmUnread(conversation: DirectConversation): ChannelUnread {
+/** A direct or group conversation's unread state in the shape text views use for channels. */
+function dmUnread(conversation: Conversation): ChannelUnread {
   return {
     channelId: conversation.id,
     lastReadMessageId: conversation.lastReadMessageId,
@@ -770,18 +894,21 @@ function DirectMessageList({
   conversations,
   selectedId,
   onSelect,
+  onCreateGroup,
 }: {
-  conversations: DirectConversation[];
+  conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onCreateGroup: () => void;
 }) {
   return (
     <section className="channel-group" aria-label="Direct messages">
       <header>
         <h3>Direct messages</h3>
+        <IconButton icon={Plus} label="New group" className="small" onClick={onCreateGroup} />
       </header>
       {conversations.length === 0 ? (
-        <p className="muted small sidebar-hint">Message a friend from the Friends page.</p>
+        <p className="muted small sidebar-hint">Message a friend from the Friends page, or start a group with +.</p>
       ) : (
         <ul>
           {conversations.map((c) => (
@@ -791,8 +918,19 @@ function DirectMessageList({
                 aria-current={c.id === selectedId}
                 onClick={() => onSelect(c.id)}
               >
-                <Avatar name={c.user.displayName} assetId={c.user.avatarAssetId} size="xs" />
-                <span>{c.user.displayName}</span>
+                {c.group ? (
+                  <GroupAvatar others={c.others} />
+                ) : (
+                  <Avatar name={c.title} assetId={c.others[0]?.avatarAssetId ?? null} size="xs" />
+                )}
+                <span className="dm-row-text">
+                  <span className="dm-row-title">{c.title}</span>
+                  {c.group && (
+                    <span className="dm-row-subtitle">
+                      {c.group.members.length} {c.group.members.length === 1 ? "member" : "members"}
+                    </span>
+                  )}
+                </span>
                 {c.unreadCount > 0 && c.id !== selectedId && (
                   <span className="unread-badge">{unreadLabel(c.unreadCount)}</span>
                 )}

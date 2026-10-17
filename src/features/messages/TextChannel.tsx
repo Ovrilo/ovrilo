@@ -1,5 +1,5 @@
 import { ArrowDown, Ban, Pencil, Trash2 } from "lucide-react";
-import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
@@ -26,10 +26,10 @@ interface TextChannelProps {
   /** May delete other people's messages (community owners). */
   canModerate: boolean;
   /**
-   * Set for a direct conversation: its unread state (communities keep theirs per channel) and the
-   * other person, who replaces the channel's welcome text.
+   * Set for a direct or group conversation: its unread state (communities keep theirs per channel)
+   * and what replaces the channel's welcome text.
    */
-  direct?: { unread: ChannelUnread; with: { displayName: string; avatarAssetId: string | null } };
+  direct?: { unread: ChannelUnread; picture: ReactNode; intro: string; group?: boolean };
 }
 
 /** Distance from the bottom (px) that still counts as "reading the latest messages". */
@@ -257,9 +257,9 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
               {!chat.hasOlder && (
                 direct ? (
                   <div className="channel-start">
-                    <Avatar name={direct.with.displayName} assetId={direct.with.avatarAssetId} size="lg" />
-                    <h2>{direct.with.displayName}</h2>
-                    <p className="muted">This is the beginning of your direct messages with {direct.with.displayName}.</p>
+                    {direct.picture}
+                    <h2>{channel.name}</h2>
+                    <p className="muted">{direct.intro}</p>
                   </div>
                 ) : (
                   <div className="channel-start">
@@ -330,7 +330,7 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
         </button>
       )}
       <Composer
-        channelName={direct ? `@${channel.name}` : `#${channel.name}`}
+        channelName={direct ? (direct.group ? channel.name : `@${channel.name}`) : `#${channel.name}`}
         onSend={(text) => {
           if (!chat.send(text)) return false;
           atBottom.current = true;

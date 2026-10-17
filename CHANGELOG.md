@@ -5,6 +5,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 ## [Unreleased]
 
 ### New
+- Group chats: press + next to Direct messages and pick up to 9 friends. Everyone in the group can chat, rename it and add their own friends; the owner can remove people. Press the phone to ring the whole group; each person answers or declines on their own.
 - Call your friends: press the phone in a direct message. They hear a ring and can answer or decline; the call works like a voice channel, with screen sharing.
 - Direct messages with friends: press Message on a friend, or pick a conversation under Direct messages. Unread messages show on the Friends button.
 - Messages from people you blocked are collapsed in shared communities (Show reveals them), and they are muted for you in voice channels.

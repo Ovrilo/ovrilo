@@ -6,6 +6,8 @@ import { Avatar } from "../../components/ui";
 export interface IncomingCallInfo {
   conversationId: string;
   caller: { id: string; displayName: string; avatarAssetId: string | null };
+  isGroup?: boolean;
+  groupName?: string | null;
 }
 
 /** Two short tones every two seconds, made with Web Audio so no sound file ships with the app. */
@@ -59,7 +61,9 @@ export function IncomingCall({
       <Avatar name={call.caller.displayName} assetId={call.caller.avatarAssetId} size="lg" />
       <div className="incoming-call-text">
         <strong>{call.caller.displayName}</strong>
-        <span className="muted small">is calling you…</span>
+        <span className="muted small">
+          {call.isGroup ? `is calling ${call.groupName ?? "your group"}…` : "is calling you…"}
+        </span>
       </div>
       <div className="incoming-call-actions">
         <button className="call-round decline" aria-label="Decline" title="Decline" onClick={onDecline}>

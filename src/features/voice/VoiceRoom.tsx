@@ -24,9 +24,12 @@ import { ParticipantMenu, type ParticipantMenuTarget } from "./ParticipantMenu";
 import { ScreenSharePicker } from "./ScreenSharePicker";
 import { clearVoiceError, useVoice, useVoiceQuality, voice, voiceAvailable } from "./voice";
 
-/** A one-to-one call in a direct conversation, shown with the same room view as a voice channel. */
+/** A call in a direct or group conversation, shown with the same room view as a voice channel. */
 export interface CallRoom {
-  other: { id: string; displayName: string; avatarAssetId: string | null };
+  /** Everyone else in the conversation. */
+  others: readonly { id: string; displayName: string; avatarAssetId: string | null }[];
+  /** Who is called: the other person's name, or the group's. */
+  title: string;
   /** The call rings (who started it), and whether anyone is connected. */
   ringingFrom: string | null;
   occupied: boolean;
@@ -99,7 +102,7 @@ export function VoiceRoom({ channel, call, user, otherChannelName, join }: Voice
   // Participants are user IDs from the voice engine; pictures come from the members list.
   const communityId = call ? null : channel.communityId;
   const memberAvatars = useMemberAvatars(communityId);
-  const avatars = call ? new Map([[call.other.id, call.other.avatarAssetId]]) : memberAvatars;
+  const avatars = call ? new Map(call.others.map((o) => [o.id, o.avatarAssetId])) : memberAvatars;
   const voiceStates = useVoiceStates(communityId);
   const here = voiceAvailable && snapshot.channelId === channel.id && snapshot.connection !== "disconnected";
 
@@ -223,8 +226,10 @@ export function VoiceRoom({ channel, call, user, otherChannelName, join }: Voice
         <p className="muted">
           {call
             ? call.occupied
-              ? `${call.other.displayName} is in the call.`
-              : `Start a voice call with ${call.other.displayName}.`
+              ? call.others.length === 1
+                ? `${call.title} is in the call.`
+                : "A call is going on in this group."
+              : `Start a voice call with ${call.title}.`
             : null}
           {otherChannelName
             ? ` You are in ${otherChannelName}. ${call ? "Calling" : "Switching"} leaves that channel.`
