@@ -1089,7 +1089,9 @@ button.small-button {
   display: grid;
   flex: 1;
   grid-template-columns: repeat(auto-fit, minmax(200px, 380px));
-  align-content: center;
+  /* Rows as tall as their 16:9 tiles; when they do not fit, the grid scrolls from the top. */
+  grid-auto-rows: max-content;
+  align-content: safe center;
   justify-content: center;
   gap: var(--space-3);
   min-height: 0;

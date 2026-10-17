@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### Fixed
+- In a small window, people in a voice channel no longer overlap or get cut off at the top; the room scrolls instead.
+
 ## [0.8.0] - 2026-10-17
 
 Friends, direct messages, group chats and calls: talk to your people outside of communities.
