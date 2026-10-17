@@ -2941,18 +2941,9 @@ button.small-button {
 /* ---------- Group conversations ---------- */
 
 .group-avatar {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-}
-
-.group-avatar .avatar:last-child {
-  margin-left: -6px;
-  box-shadow: 0 0 0 2px var(--surface-1);
-}
-
-.group-avatar-lg .avatar:last-child {
-  margin-left: -24px;
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary) 22%, var(--surface-2));
+  color: var(--text-primary);
 }
 
 .dm-row-text {

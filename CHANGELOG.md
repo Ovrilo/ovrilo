@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### Fixed
+- Group chats show a clear group icon instead of two overlapping pictures that hid each other's initials.
+
 ## [0.8.0] - 2026-10-17
 
 Friends, direct messages, group chats and calls: talk to your people outside of communities.
