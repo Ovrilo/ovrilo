@@ -16,6 +16,7 @@ import { useJoinVoice } from "../voice/useJoinVoice";
 import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/ParticipantMenu";
 import { useVoice, voice, voiceAvailable } from "../voice/voice";
 import { VoiceDock } from "../voice/VoiceDock";
+import { useMuteBlockedInVoice } from "../voice/useMuteBlocked";
 import { VoiceRoom } from "../voice/VoiceRoom";
 import { MembersPanel } from "./MembersPanel";
 import { ChannelMenu, type ChannelMenuTarget } from "./ChannelMenu";
@@ -67,6 +68,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [dmId, setDmId] = useState<string | null>(null);
   useFriendsSync();
   useDirectMessagesSync();
+  useMuteBlockedInVoice();
   const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
   const directMessages = useDirectMessages();
   const openDirectMessage = useOpenDirectMessage();

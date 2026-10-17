@@ -96,3 +96,26 @@ export function groupRows(messages: Message[]): MessageRow[] {
     return { message, continued };
   });
 }
+
+/** A run of consecutive messages by people the reader blocked, shown as one collapsed row. */
+export interface BlockedRun {
+  /** First message of the run: the run's identity and where the collapsed row goes. */
+  start: number;
+  count: number;
+}
+
+/** For every message by a blocked author, the run it belongs to. */
+export function blockedRuns(messages: readonly Message[], blocked: ReadonlySet<string>): Map<number, BlockedRun> {
+  const runs = new Map<number, BlockedRun>();
+  let current: BlockedRun | null = null;
+  for (const message of messages) {
+    if (!blocked.has(message.author.id)) {
+      current = null;
+      continue;
+    }
+    current ??= { start: message.id, count: 0 };
+    current.count += 1;
+    runs.set(message.id, current);
+  }
+  return runs;
+}
