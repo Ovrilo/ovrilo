@@ -4,6 +4,10 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
+Friends, direct messages, group chats and calls: talk to your people outside of communities.
+
 ### New
 - Invite friends to a community with one click: open Invite in the community menu and press Invite next to a friend. They get the invitation in your direct messages as a card with the community's name and a Join button.
 - Group chats: press + next to Direct messages and pick up to 9 friends. Everyone in the group can chat, rename it and add their own friends; the owner can remove people. Press the phone to ring the whole group; each person answers or declines on their own.
