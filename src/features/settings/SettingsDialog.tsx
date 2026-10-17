@@ -212,12 +212,12 @@ function InputMode() {
 }
 
 const NOISE_OPTIONS: { value: NoiseSuppression; label: string; hint: string }[] = [
+  { value: "standard", label: "Standard", hint: "Reduces steady noise such as fans and hum. Clicks still come through." },
   {
     value: "enhanced",
-    label: "Enhanced",
-    hint: "Removes keyboard and mouse clicks and room noise, and keeps your microphone silent between words.",
+    label: "Enhanced (beta)",
+    hint: "Also removes keyboard and mouse clicks and keeps your microphone silent between words. Still being tuned: it can cut off parts of what you say.",
   },
-  { value: "standard", label: "Standard", hint: "Reduces steady noise such as fans and hum. Clicks still come through." },
   { value: "off", label: "Off", hint: "Sends your microphone as it is." },
 ];
 

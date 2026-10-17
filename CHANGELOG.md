@@ -12,6 +12,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 - Messages from people you blocked are collapsed in shared communities (Show reveals them), and they are muted for you in voice channels.
 - Friends: add people by their username, accept or decline requests, remove friends and block people. Open Friends at the top of the community list to see who is online; a badge shows new requests.
 
+### Changed
+- Noise suppression defaults to Standard again: Enhanced could cut off parts of what you say. If you were on Enhanced from the 0.7.0 default, you are moved to Standard once; Enhanced (beta) is still available under Settings → Voice & audio.
+
 ## [0.7.0] - 2026-10-16
 
 Quieter calls: your friends stop hearing your keyboard, and you can set how loud your microphone and speakers are.
