@@ -9,6 +9,8 @@ export interface RealtimeEvents {
   MessageDeleted: Schemas["MessageResponse"];
   ReadStateUpdated: Schemas["ReadStateResponse"];
   PresenceChanged: { userId: string; online: boolean };
+  /** contracts/events/README.md: the other person and what changed; refetch the lists. */
+  FriendsChanged: { change: "requestReceived" | "friendAdded" | "updated"; user: Schemas["SocialUserResponse"] };
   UserUpdated: { userId: string; displayName: string; avatarAssetId: string | null };
   CommunityUpdated: { communityId: string; name: string; description: string | null; iconAssetId: string | null };
   ChannelsChanged: { communityId: string; channelId: string; change: "created" | "updated" | "deleted" };
@@ -109,6 +111,18 @@ export class RealtimeClient {
         void this.connection.invoke("UnsubscribeCommunity", communityId).catch(() => undefined);
       }
     };
+  }
+
+  /** Friends online now, or null while disconnected. Changes arrive as `PresenceChanged`. */
+  async getFriendsPresence(): Promise<string[] | null> {
+    const connection = this.connection;
+    if (connection?.state !== HubConnectionState.Connected) return null;
+    try {
+      const snapshot = await connection.invoke<{ onlineUserIds: string[] }>("GetFriendsPresence");
+      return snapshot.onlineUserIds;
+    } catch {
+      return null;
+    }
   }
 
   start(): void {
