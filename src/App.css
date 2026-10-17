@@ -3089,3 +3089,100 @@ label.friend-picker-row {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* ---------- Community invitations ---------- */
+
+.dialog-subheading {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invite-friends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.invite-friends-list {
+  overflow-y: auto;
+  max-height: 240px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+
+.invite-friend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 4px var(--space-3);
+}
+
+.invite-friend-row:hover {
+  background: var(--surface-2);
+}
+
+.invite-friend-name {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 420px;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+}
+
+.invite-card-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.invite-card-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.invite-card-text {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.invite-card-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-card.invalid strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.invite-card .community-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 15px;
+}
