@@ -2644,3 +2644,183 @@ button.small-button {
   flex-direction: column;
   gap: 2px;
 }
+
+/* ---------- Friends home ---------- */
+
+.space-home {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.space-home[aria-current="true"] {
+  color: var(--primary);
+}
+
+.space-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.friends {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.friends-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.friends-tabs button {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.friends-tabs button[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.friends-tabs .unread-badge {
+  margin-left: 0;
+}
+
+.friends-tabs .friends-add-tab {
+  color: var(--success);
+}
+
+.friends-tabs .friends-add-tab[aria-selected="true"] {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
+
+.friends-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+.friends-filter {
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+.friends-count {
+  margin: var(--space-2) 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.friends-list {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.friend-row:hover {
+  border-top-color: transparent;
+  background: var(--surface-2);
+}
+
+.friend-row:hover + .friend-row {
+  border-top-color: transparent;
+}
+
+.friend-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.friend-text strong,
+.friend-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.friend-row .presence-dot {
+  border-color: var(--surface-1);
+}
+
+.friend-row:hover .presence-dot {
+  border-color: var(--surface-2);
+}
+
+.friends-note {
+  padding: var(--space-4) 0;
+}
+
+.friends-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.friends-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 560px;
+}
+
+.friends-add h2 {
+  font-size: 16px;
+}
+
+.friends-add-form {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.friends-add-form input {
+  flex: 1;
+}
+
+.friends-add-ok {
+  color: var(--success);
+}

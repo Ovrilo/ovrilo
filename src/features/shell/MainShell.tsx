@@ -5,6 +5,8 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 import { Avatar, CommunityIcon, IconButton } from "../../components/ui";
+import { useFriendRequests, useFriendsSync } from "../friends/friends";
+import { FriendsView } from "../friends/FriendsView";
 import { TextChannel } from "../messages/TextChannel";
 import { type ChannelUnread, isUnread, unreadLabel, useCommunitiesWithUnread, useUnread, useUnreadSync } from "../messages/unread";
 import { SettingsDialog } from "../settings/SettingsDialog";
@@ -58,6 +60,10 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [channelMenu, setChannelMenu] = useState<ChannelMenuTarget | null>(null);
   const [communityMenu, setCommunityMenu] = useState<{ x: number; y: number; anchor: HTMLElement } | null>(null);
   const [showMembers, setShowMembers] = useState(readShowMembers);
+  // The friends home replaces the community sidebar and main pane while it is open.
+  const [home, setHome] = useState(false);
+  useFriendsSync();
+  const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
   const { snapshot } = useVoice();
   const join = useJoinVoice();
   useProfileUpdates(user.id);
@@ -90,7 +96,10 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const connectedName =
     connectedChannel?.id === connectedChannelId ? connectedChannel?.name ?? "Voice channel" : "Voice channel";
 
-  const selectCommunity = (id: string) => setSelectedCommunityId(id);
+  const selectCommunity = (id: string) => {
+    setHome(false);
+    setSelectedCommunityId(id);
+  };
 
   /** We left or deleted a community: hang up if we were talking there, then show another one. */
   const forgetCommunity = (id: string) => {
@@ -136,16 +145,31 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   return (
     <div className="app-shell">
       <nav className="space-rail" aria-label="Communities">
+        <button
+          className="space-button space-home"
+          aria-current={home}
+          aria-label={incomingRequests > 0 ? `Friends, ${incomingRequests} pending requests` : "Friends"}
+          title="Friends"
+          onClick={() => setHome(true)}
+        >
+          <Users size={20} aria-hidden="true" />
+          {incomingRequests > 0 && (
+            <span className="space-badge" aria-hidden="true">
+              {unreadLabel(incomingRequests)}
+            </span>
+          )}
+        </button>
+        <span className="rail-divider" aria-hidden="true" />
         {communities.data?.map((c) => (
           <button
             key={c.id}
             className="space-button avatar-hover-scope"
-            aria-current={c.id === community?.id}
+            aria-current={!home && c.id === community?.id}
             aria-label={c.name}
             title={c.name}
             onClick={() => selectCommunity(c.id)}
           >
-            {communitiesWithUnread.has(c.id) && c.id !== community?.id && (
+            {communitiesWithUnread.has(c.id) && (home || c.id !== community?.id) && (
               <span className="space-unread" aria-label="Unread messages" />
             )}
             <CommunityIcon name={c.name} assetId={c.iconAssetId} />
@@ -159,8 +183,22 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <IconButton icon={LogIn} label="Join with an invitation" className="rail-action" onClick={() => setDialog("joinCommunity")} />
       </nav>
 
-      <aside className="channel-sidebar" aria-label="Channels">
-        {community ? (
+      <aside className="channel-sidebar" aria-label={home ? "Friends" : "Channels"}>
+        {home ? (
+          <>
+            <header className="sidebar-header">
+              <h2>Home</h2>
+            </header>
+            <div className="channel-list">
+              <button className="channel-row" aria-current={true}>
+                <Users size={16} aria-hidden="true" />
+                <span>Friends</span>
+                {incomingRequests > 0 && <span className="unread-badge">{unreadLabel(incomingRequests)}</span>}
+              </button>
+              <p className="muted small sidebar-hint">Direct messages will appear here.</p>
+            </div>
+          </>
+        ) : community ? (
           <>
             <header className="sidebar-header">
               <h2 className="community-title">
@@ -269,7 +307,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       </aside>
 
       <main className="main-pane">
-        {channel ? (
+        {home ? (
+          <FriendsView />
+        ) : channel ? (
           <>
             <header className="channel-header">
               {channel.type === "text" ? (
