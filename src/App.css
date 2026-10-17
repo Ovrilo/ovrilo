@@ -2644,3 +2644,545 @@ button.small-button {
   flex-direction: column;
   gap: 2px;
 }
+
+/* ---------- Friends home ---------- */
+
+.space-home {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.space-home[aria-current="true"] {
+  color: var(--primary);
+}
+
+.space-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.friends {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.friends-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.friends-tabs button {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.friends-tabs button[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.friends-tabs .unread-badge {
+  margin-left: 0;
+}
+
+.friends-tabs .friends-add-tab {
+  color: var(--success);
+}
+
+.friends-tabs .friends-add-tab[aria-selected="true"] {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
+
+.friends-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+.friends-filter {
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+.friends-count {
+  margin: var(--space-2) 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.friends-list {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.friend-row:hover {
+  border-top-color: transparent;
+  background: var(--surface-2);
+}
+
+.friend-row:hover + .friend-row {
+  border-top-color: transparent;
+}
+
+.friend-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.friend-text strong,
+.friend-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.friend-row .presence-dot {
+  border-color: var(--surface-1);
+}
+
+.friend-row:hover .presence-dot {
+  border-color: var(--surface-2);
+}
+
+.friends-note {
+  padding: var(--space-4) 0;
+}
+
+.friends-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.friends-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 560px;
+}
+
+.friends-add h2 {
+  font-size: 16px;
+}
+
+.friends-add-form {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.friends-add-form input {
+  flex: 1;
+}
+
+.friends-add-ok {
+  color: var(--success);
+}
+
+/* Messages from people you blocked, collapsed into one row per run. */
+.blocked-messages {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-5) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-2) 50%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.blocked-messages .link {
+  margin-left: auto;
+}
+
+/* ---------- Direct-message calls ---------- */
+
+/* The call sits above the conversation; messages keep the rest of the height. */
+.dm-call {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  height: min(48vh, 420px);
+  min-height: 220px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.dm-call > .call,
+.dm-call > .voice-lobby {
+  flex: 1;
+  min-height: 0;
+}
+
+.dm-call-status {
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.incoming-call {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 300px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-1);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+}
+
+.incoming-call .avatar {
+  animation: call-pulse 1.6s ease-in-out infinite;
+}
+
+.incoming-call-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.incoming-call-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.call-round {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.call-round.accept {
+  background: var(--success);
+}
+
+.call-round.decline {
+  background: var(--danger);
+}
+
+.call-round:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+@keyframes call-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--success) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incoming-call .avatar {
+    animation: none;
+  }
+}
+
+/* ---------- Group conversations ---------- */
+
+.group-avatar {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.group-avatar .avatar:last-child {
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--surface-1);
+}
+
+.group-avatar-lg .avatar:last-child {
+  margin-left: -24px;
+}
+
+.dm-row-text {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.dm-row-title,
+.dm-row-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-row-subtitle {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.group-title-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.group-title-button svg {
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.group-title-button:hover,
+.group-title-button:focus-visible {
+  background: var(--surface-2);
+}
+
+.group-title-button:hover svg,
+.group-title-button:focus-visible svg {
+  opacity: 1;
+}
+
+.member-remove {
+  margin-left: auto;
+  opacity: 0;
+}
+
+.member-row:hover .member-remove,
+.member-remove:focus-visible {
+  opacity: 1;
+}
+
+.friend-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.friend-picker-list {
+  overflow-y: auto;
+  max-height: 260px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+
+label.friend-picker-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  gap: var(--space-3);
+  padding: 6px var(--space-3);
+  margin: 0;
+  cursor: pointer;
+}
+
+.friend-picker-row:hover {
+  background: var(--surface-2);
+}
+
+.friend-picker-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.friend-picker-name {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-picker-check {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #fff;
+}
+
+.friend-picker-row.checked .friend-picker-check {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.friend-picker-row input:focus-visible + .friend-picker-check {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.friend-picker-row:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ---------- Community invitations ---------- */
+
+.dialog-subheading {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invite-friends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.invite-friends-list {
+  overflow-y: auto;
+  max-height: 240px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+
+.invite-friend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 4px var(--space-3);
+}
+
+.invite-friend-row:hover {
+  background: var(--surface-2);
+}
+
+.invite-friend-name {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 420px;
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+}
+
+.invite-card-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.invite-card-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.invite-card-text {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.invite-card-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-card.invalid strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.invite-card .community-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 15px;
+}

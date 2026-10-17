@@ -1,12 +1,14 @@
-import { ArrowDown, Pencil, Trash2 } from "lucide-react";
-import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ArrowDown, Ban, Pencil, Trash2 } from "lucide-react";
+import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
-import { groupRows, type Message } from "./history";
+import { useBlocks } from "../friends/friends";
+import { InviteCard, inviteCode, withoutInviteLink } from "../friends/invites";
+import { blockedRuns, groupRows, type Message } from "./history";
 import { sendThrottle } from "./throttle";
 import { type PendingMessage, useChannelMessages } from "./useChannelMessages";
-import { useMarkRead, useUnread } from "./unread";
+import { type ChannelUnread, useMarkRead, useUnread } from "./unread";
 
 const MAX_LENGTH = 4000;
 
@@ -19,10 +21,16 @@ function formatTime(iso: string): string {
 }
 
 interface TextChannelProps {
-  channel: Schemas["ChannelResponse"];
+  /** A community text channel, or a direct conversation (its id is used as the channel id). */
+  channel: Pick<Schemas["ChannelResponse"], "id" | "name" | "communityId">;
   user: Schemas["CurrentUserResponse"];
   /** May delete other people's messages (community owners). */
   canModerate: boolean;
+  /**
+   * Set for a direct or group conversation: its unread state (communities keep theirs per channel)
+   * and what replaces the channel's welcome text.
+   */
+  direct?: { unread: ChannelUnread; picture: ReactNode; intro: string; group?: boolean };
 }
 
 /** Distance from the bottom (px) that still counts as "reading the latest messages". */
@@ -68,7 +76,7 @@ function useWindowAttention(): boolean {
 }
 
 /** A text channel: history with live updates, and a composer (DESIGN.md §5.3). */
-export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
+export function TextChannel({ channel, user, canModerate, direct }: TextChannelProps) {
   const chat = useChannelMessages(channel.id);
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -81,7 +89,18 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
   const newestId = chat.messages[chat.messages.length - 1]?.id;
   const attentive = useWindowAttention();
   const markRead = useMarkRead(channel.id);
-  const unread = useUnread(channel.communityId).data?.find((u) => u.channelId === channel.id);
+  // Messages by people you blocked are collapsed; `revealed` holds the runs you chose to show.
+  const blocks = useBlocks(true).data;
+  const blocked = useMemo(() => new Set(blocks?.map((b) => b.user.id)), [blocks]);
+  const [revealed, setRevealed] = useState<ReadonlySet<number>>(() => new Set());
+  const toggleRun = (start: number) =>
+    setRevealed((current) => {
+      const next = new Set(current);
+      if (!next.delete(start)) next.add(start);
+      return next;
+    });
+  const communityUnread = useUnread(direct ? null : channel.communityId).data?.find((u) => u.channelId === channel.id);
+  const unread = direct?.unread ?? communityUnread;
   // Where reading stopped when the channel was opened; the "New" line stays there while it is open.
   const [openedAt, setOpenedAt] = useState<{ lastRead: number; count: number } | null>(null);
   // The view has been placed at the first unread message (or the newest); reading counts from then.
@@ -205,6 +224,7 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
   };
 
   const rows = groupRows(chat.messages);
+  const runs = blockedRuns(chat.messages, blocked);
   const firstUnreadId =
     openedAt && openedAt.count > 0
       ? chat.messages.find((m) => m.id > openedAt.lastRead && m.author.id !== user.id)?.id
@@ -236,19 +256,30 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
             <>
               {chat.loadingOlder && <p className="message-note muted">Loading older messages…</p>}
               {!chat.hasOlder && (
-                <div className="channel-start">
-                  <span className="channel-start-icon" aria-hidden="true">
-                    #
-                  </span>
-                  <h2>Welcome to #{channel.name}</h2>
-                  <p className="muted">This is the start of the channel.</p>
-                </div>
+                direct ? (
+                  <div className="channel-start">
+                    {direct.picture}
+                    <h2>{channel.name}</h2>
+                    <p className="muted">{direct.intro}</p>
+                  </div>
+                ) : (
+                  <div className="channel-start">
+                    <span className="channel-start-icon" aria-hidden="true">
+                      #
+                    </span>
+                    <h2>Welcome to #{channel.name}</h2>
+                    <p className="muted">This is the start of the channel.</p>
+                  </div>
+                )
               )}
               <ol className="messages" aria-label={`Messages in ${channel.name}`}>
                 {rows.map(({ message, continued }, index) => {
                   const previous = rows[index - 1]?.message;
                   const newDay = !previous || dayLabel(previous.createdAt) !== dayLabel(message.createdAt);
                   const firstUnread = message.id === firstUnreadId;
+                  const run = runs.get(message.id);
+                  const runStart = run?.start === message.id;
+                  const hidden = run !== undefined && !revealed.has(run.start);
                   return (
                     <Fragment key={message.id}>
                       {newDay && (
@@ -261,14 +292,27 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
                           <span>New</span>
                         </li>
                       )}
-                      <MessageItem
-                        message={message}
-                        continued={continued && !newDay && !firstUnread}
-                        own={message.author.id === user.id}
-                        canDelete={message.author.id === user.id || canModerate}
-                        onEdit={chat.edit}
-                        onDelete={chat.remove}
-                      />
+                      {run && runStart && (
+                        <li className="blocked-messages">
+                          <Ban size={14} aria-hidden="true" />
+                          <span>
+                            {run.count} blocked {run.count === 1 ? "message" : "messages"}
+                          </span>
+                          <button className="link" onClick={() => toggleRun(run.start)}>
+                            {hidden ? "Show" : "Hide"}
+                          </button>
+                        </li>
+                      )}
+                      {!hidden && (
+                        <MessageItem
+                          message={message}
+                          continued={continued && !newDay && !firstUnread && !runStart}
+                          own={message.author.id === user.id}
+                          canDelete={message.author.id === user.id || canModerate}
+                          onEdit={chat.edit}
+                          onDelete={chat.remove}
+                        />
+                      )}
                     </Fragment>
                   );
                 })}
@@ -287,7 +331,7 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
         </button>
       )}
       <Composer
-        channelName={channel.name}
+        channelName={direct ? (direct.group ? channel.name : `@${channel.name}`) : `#${channel.name}`}
         onSend={(text) => {
           if (!chat.send(text)) return false;
           atBottom.current = true;
@@ -317,6 +361,8 @@ function MessageItem({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = message.author.displayName ?? "Deleted user";
+  const invite = inviteCode(message.content);
+  const text = invite && message.content ? withoutInviteLink(message.content) : message.content;
 
   return (
     <li className={`message avatar-hover-scope${continued ? " continued" : ""}`} data-message-id={message.id}>
@@ -351,10 +397,15 @@ function MessageItem({
             }}
           />
         ) : (
-          <p className="message-text">
-            {message.content}
-            {message.editedAt && <span className="message-edited muted"> (edited)</span>}
-          </p>
+          <>
+            {text && (
+              <p className="message-text">
+                {text}
+                {message.editedAt && <span className="message-edited muted"> (edited)</span>}
+              </p>
+            )}
+            {invite && <InviteCard code={invite} own={own} />}
+          </>
         )}
         {error && <p className="form-error small">{error}</p>}
       </div>
@@ -476,8 +527,8 @@ function Composer({ channelName, onSend }: { channelName: string; onSend: (text:
         ref={area}
         rows={1}
         value={text}
-        placeholder={`Message #${channelName}`}
-        aria-label={`Message #${channelName}`}
+        placeholder={`Message ${channelName}`}
+        aria-label={`Message ${channelName}`}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
       />
