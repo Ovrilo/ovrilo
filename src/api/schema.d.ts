@@ -421,6 +421,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your direct conversations with unread counts, most recently active first. */
+        get: operations["ListDirectMessages"];
+        put?: never;
+        /** Opens the direct conversation with a friend (201), or returns the existing one (200). Use its id as the channel id for messages and read state. */
+        post: operations["OpenDirectMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/messages/{messageId}": {
         parameters: {
             query?: never;
@@ -689,6 +707,14 @@ export interface components {
         };
         /** @enum {unknown} */
         CommunityRole: "member" | "owner";
+        ConversationUserResponse: {
+            /** Format: uuid */
+            id: string;
+            username: string;
+            displayName: string;
+            /** Format: uuid */
+            avatarAssetId: null | string;
+        };
         CreateChannelRequest: {
             name: string;
             type: components["schemas"]["ChannelType"];
@@ -724,6 +750,19 @@ export interface components {
             createdAt: string;
             /** Format: uuid */
             avatarAssetId: null | string;
+        };
+        DirectConversationResponse: {
+            /** Format: uuid */
+            id: string;
+            user: components["schemas"]["ConversationUserResponse"];
+            /** Format: int64 */
+            lastMessageId: null | number;
+            /** Format: date-time */
+            lastActivityAt: string;
+            /** Format: int64 */
+            lastReadMessageId: null | number;
+            /** Format: int32 */
+            unreadCount: number;
         };
         DownloadUrl: {
             /** Format: uuid */
@@ -846,6 +885,10 @@ export interface components {
             editedAt: null | string;
             /** Format: date-time */
             deletedAt: null | string;
+        };
+        OpenDirectMessageRequest: {
+            /** Format: uuid */
+            userId: string;
         };
         ProblemDetails: {
             type?: null | string;
@@ -2462,6 +2505,100 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListDirectMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectConversationResponse"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OpenDirectMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenDirectMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectConversationResponse"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectConversationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

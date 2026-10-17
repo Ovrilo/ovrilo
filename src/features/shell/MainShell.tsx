@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Schemas } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
 import { Avatar, CommunityIcon, IconButton } from "../../components/ui";
+import { type DirectConversation, useDirectMessages, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
 import { FriendsView } from "../friends/FriendsView";
 import { TextChannel } from "../messages/TextChannel";
@@ -62,8 +63,18 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   const [showMembers, setShowMembers] = useState(readShowMembers);
   // The friends home replaces the community sidebar and main pane while it is open.
   const [home, setHome] = useState(false);
+  // The direct conversation open in the friends home (null: the friends page).
+  const [dmId, setDmId] = useState<string | null>(null);
   useFriendsSync();
+  useDirectMessagesSync();
   const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
+  const directMessages = useDirectMessages();
+  const openDirectMessage = useOpenDirectMessage();
+  const unreadDirect = directMessages.data?.reduce((sum, c) => sum + c.unreadCount, 0) ?? 0;
+  const homeBadge = incomingRequests + unreadDirect;
+  const openDm = directMessages.data?.find((c) => c.id === dmId) ?? null;
+  const messageFriend = (userId: string) =>
+    openDirectMessage.mutate(userId, { onSuccess: (conversation) => setDmId(conversation.id) });
   const { snapshot } = useVoice();
   const join = useJoinVoice();
   useProfileUpdates(user.id);
@@ -148,14 +159,14 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
         <button
           className="space-button space-home"
           aria-current={home}
-          aria-label={incomingRequests > 0 ? `Friends, ${incomingRequests} pending requests` : "Friends"}
+          aria-label={homeBadge > 0 ? `Friends and direct messages, ${homeBadge} new` : "Friends and direct messages"}
           title="Friends"
           onClick={() => setHome(true)}
         >
           <Users size={20} aria-hidden="true" />
-          {incomingRequests > 0 && (
+          {homeBadge > 0 && (
             <span className="space-badge" aria-hidden="true">
-              {unreadLabel(incomingRequests)}
+              {unreadLabel(homeBadge)}
             </span>
           )}
         </button>
@@ -190,12 +201,12 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
               <h2>Home</h2>
             </header>
             <div className="channel-list">
-              <button className="channel-row" aria-current={true}>
+              <button className="channel-row" aria-current={dmId === null} onClick={() => setDmId(null)}>
                 <Users size={16} aria-hidden="true" />
                 <span>Friends</span>
                 {incomingRequests > 0 && <span className="unread-badge">{unreadLabel(incomingRequests)}</span>}
               </button>
-              <p className="muted small sidebar-hint">Direct messages will appear here.</p>
+              <DirectMessageList conversations={directMessages.data ?? []} selectedId={dmId} onSelect={setDmId} />
             </div>
           </>
         ) : community ? (
@@ -307,8 +318,23 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
       </aside>
 
       <main className="main-pane">
-        {home ? (
-          <FriendsView />
+        {home && openDm ? (
+          <>
+            <header className="channel-header">
+              <Avatar name={openDm.user.displayName} assetId={openDm.user.avatarAssetId} size="xs" />
+              <h1>{openDm.user.displayName}</h1>
+              <span className="muted channel-topic">@{openDm.user.username}</span>
+            </header>
+            <TextChannel
+              key={openDm.id}
+              channel={{ id: openDm.id, name: openDm.user.displayName, communityId: "" }}
+              user={user}
+              canModerate={false}
+              direct={{ unread: dmUnread(openDm), with: openDm.user }}
+            />
+          </>
+        ) : home ? (
+          <FriendsView onMessage={messageFriend} />
         ) : channel ? (
           <>
             <header className="channel-header">
@@ -612,4 +638,53 @@ function writeShowMembers(value: boolean) {
   } catch {
     // Not remembered; the default applies next time.
   }
+}
+
+/** A direct conversation's unread state in the shape text views use for channels. */
+function dmUnread(conversation: DirectConversation): ChannelUnread {
+  return {
+    channelId: conversation.id,
+    lastReadMessageId: conversation.lastReadMessageId,
+    lastMessageId: conversation.lastMessageId,
+    unreadCount: conversation.unreadCount,
+  };
+}
+
+function DirectMessageList({
+  conversations,
+  selectedId,
+  onSelect,
+}: {
+  conversations: DirectConversation[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section className="channel-group" aria-label="Direct messages">
+      <header>
+        <h3>Direct messages</h3>
+      </header>
+      {conversations.length === 0 ? (
+        <p className="muted small sidebar-hint">Message a friend from the Friends page.</p>
+      ) : (
+        <ul>
+          {conversations.map((c) => (
+            <li key={c.id}>
+              <button
+                className={`channel-row dm-row avatar-hover-scope${c.unreadCount > 0 && c.id !== selectedId ? " unread" : ""}`}
+                aria-current={c.id === selectedId}
+                onClick={() => onSelect(c.id)}
+              >
+                <Avatar name={c.user.displayName} assetId={c.user.avatarAssetId} size="xs" />
+                <span>{c.user.displayName}</span>
+                {c.unreadCount > 0 && c.id !== selectedId && (
+                  <span className="unread-badge">{unreadLabel(c.unreadCount)}</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }

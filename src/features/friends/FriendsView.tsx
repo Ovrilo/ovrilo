@@ -1,4 +1,4 @@
-import { Ban, Check, UserMinus, Users, X } from "lucide-react";
+import { Ban, Check, MessageCircle, UserMinus, Users, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 
 import { problemMessage } from "../../api/client";
@@ -17,7 +17,7 @@ import {
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
 /** The friends home (DESIGN.md §5): who is online, requests to answer, blocks, and adding someone. */
-export function FriendsView() {
+export function FriendsView({ onMessage }: { onMessage: (userId: string) => void }) {
   const [tab, setTab] = useState<Tab>("online");
   const friends = useFriends();
   const requests = useFriendRequests();
@@ -69,6 +69,7 @@ export function FriendsView() {
                 : "No friends yet. Add someone by their username."
             }
             onAdd={() => setTab("add")}
+            onMessage={onMessage}
             heading={tab === "online" ? "Online" : "All friends"}
           />
         )}
@@ -140,6 +141,7 @@ function FriendList({
   empty,
   heading,
   onAdd,
+  onMessage,
 }: {
   friends: Friend[];
   online: ReadonlySet<string>;
@@ -147,6 +149,7 @@ function FriendList({
   empty: string;
   heading: string;
   onAdd: () => void;
+  onMessage: (userId: string) => void;
 }) {
   const { remove, block } = useFriendActions();
   const [filter, setFilter] = useState("");
@@ -180,6 +183,7 @@ function FriendList({
       <ul className="friends-list">
         {shown.map((f) => (
           <PersonRow key={f.user.id} user={f.user} online={online.has(f.user.id)} status={online.has(f.user.id) ? "Online" : "Offline"}>
+            <IconButton icon={MessageCircle} label={`Message ${f.user.displayName}`} onClick={() => onMessage(f.user.id)} />
             <IconButton
               icon={UserMinus}
               label={`Remove ${f.user.displayName}`}

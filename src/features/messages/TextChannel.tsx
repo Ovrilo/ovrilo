@@ -6,7 +6,7 @@ import { Avatar } from "../../components/ui";
 import { groupRows, type Message } from "./history";
 import { sendThrottle } from "./throttle";
 import { type PendingMessage, useChannelMessages } from "./useChannelMessages";
-import { useMarkRead, useUnread } from "./unread";
+import { type ChannelUnread, useMarkRead, useUnread } from "./unread";
 
 const MAX_LENGTH = 4000;
 
@@ -19,10 +19,16 @@ function formatTime(iso: string): string {
 }
 
 interface TextChannelProps {
-  channel: Schemas["ChannelResponse"];
+  /** A community text channel, or a direct conversation (its id is used as the channel id). */
+  channel: Pick<Schemas["ChannelResponse"], "id" | "name" | "communityId">;
   user: Schemas["CurrentUserResponse"];
   /** May delete other people's messages (community owners). */
   canModerate: boolean;
+  /**
+   * Set for a direct conversation: its unread state (communities keep theirs per channel) and the
+   * other person, who replaces the channel's welcome text.
+   */
+  direct?: { unread: ChannelUnread; with: { displayName: string; avatarAssetId: string | null } };
 }
 
 /** Distance from the bottom (px) that still counts as "reading the latest messages". */
@@ -68,7 +74,7 @@ function useWindowAttention(): boolean {
 }
 
 /** A text channel: history with live updates, and a composer (DESIGN.md §5.3). */
-export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
+export function TextChannel({ channel, user, canModerate, direct }: TextChannelProps) {
   const chat = useChannelMessages(channel.id);
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -81,7 +87,8 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
   const newestId = chat.messages[chat.messages.length - 1]?.id;
   const attentive = useWindowAttention();
   const markRead = useMarkRead(channel.id);
-  const unread = useUnread(channel.communityId).data?.find((u) => u.channelId === channel.id);
+  const communityUnread = useUnread(direct ? null : channel.communityId).data?.find((u) => u.channelId === channel.id);
+  const unread = direct?.unread ?? communityUnread;
   // Where reading stopped when the channel was opened; the "New" line stays there while it is open.
   const [openedAt, setOpenedAt] = useState<{ lastRead: number; count: number } | null>(null);
   // The view has been placed at the first unread message (or the newest); reading counts from then.
@@ -236,13 +243,21 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
             <>
               {chat.loadingOlder && <p className="message-note muted">Loading older messages…</p>}
               {!chat.hasOlder && (
-                <div className="channel-start">
-                  <span className="channel-start-icon" aria-hidden="true">
-                    #
-                  </span>
-                  <h2>Welcome to #{channel.name}</h2>
-                  <p className="muted">This is the start of the channel.</p>
-                </div>
+                direct ? (
+                  <div className="channel-start">
+                    <Avatar name={direct.with.displayName} assetId={direct.with.avatarAssetId} size="lg" />
+                    <h2>{direct.with.displayName}</h2>
+                    <p className="muted">This is the beginning of your direct messages with {direct.with.displayName}.</p>
+                  </div>
+                ) : (
+                  <div className="channel-start">
+                    <span className="channel-start-icon" aria-hidden="true">
+                      #
+                    </span>
+                    <h2>Welcome to #{channel.name}</h2>
+                    <p className="muted">This is the start of the channel.</p>
+                  </div>
+                )
               )}
               <ol className="messages" aria-label={`Messages in ${channel.name}`}>
                 {rows.map(({ message, continued }, index) => {
@@ -287,7 +302,7 @@ export function TextChannel({ channel, user, canModerate }: TextChannelProps) {
         </button>
       )}
       <Composer
-        channelName={channel.name}
+        channelName={direct ? `@${channel.name}` : `#${channel.name}`}
         onSend={(text) => {
           if (!chat.send(text)) return false;
           atBottom.current = true;
@@ -476,8 +491,8 @@ function Composer({ channelName, onSend }: { channelName: string; onSend: (text:
         ref={area}
         rows={1}
         value={text}
-        placeholder={`Message #${channelName}`}
-        aria-label={`Message #${channelName}`}
+        placeholder={`Message ${channelName}`}
+        aria-label={`Message ${channelName}`}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
       />
