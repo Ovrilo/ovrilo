@@ -1,9 +1,10 @@
-import { ArrowDown, Pencil, Trash2 } from "lucide-react";
-import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ArrowDown, Ban, Pencil, Trash2 } from "lucide-react";
+import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { problemMessage, type Schemas } from "../../api/client";
 import { Avatar } from "../../components/ui";
-import { groupRows, type Message } from "./history";
+import { useBlocks } from "../friends/friends";
+import { blockedRuns, groupRows, type Message } from "./history";
 import { sendThrottle } from "./throttle";
 import { type PendingMessage, useChannelMessages } from "./useChannelMessages";
 import { type ChannelUnread, useMarkRead, useUnread } from "./unread";
@@ -87,6 +88,16 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
   const newestId = chat.messages[chat.messages.length - 1]?.id;
   const attentive = useWindowAttention();
   const markRead = useMarkRead(channel.id);
+  // Messages by people you blocked are collapsed; `revealed` holds the runs you chose to show.
+  const blocks = useBlocks(true).data;
+  const blocked = useMemo(() => new Set(blocks?.map((b) => b.user.id)), [blocks]);
+  const [revealed, setRevealed] = useState<ReadonlySet<number>>(() => new Set());
+  const toggleRun = (start: number) =>
+    setRevealed((current) => {
+      const next = new Set(current);
+      if (!next.delete(start)) next.add(start);
+      return next;
+    });
   const communityUnread = useUnread(direct ? null : channel.communityId).data?.find((u) => u.channelId === channel.id);
   const unread = direct?.unread ?? communityUnread;
   // Where reading stopped when the channel was opened; the "New" line stays there while it is open.
@@ -212,6 +223,7 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
   };
 
   const rows = groupRows(chat.messages);
+  const runs = blockedRuns(chat.messages, blocked);
   const firstUnreadId =
     openedAt && openedAt.count > 0
       ? chat.messages.find((m) => m.id > openedAt.lastRead && m.author.id !== user.id)?.id
@@ -264,6 +276,9 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
                   const previous = rows[index - 1]?.message;
                   const newDay = !previous || dayLabel(previous.createdAt) !== dayLabel(message.createdAt);
                   const firstUnread = message.id === firstUnreadId;
+                  const run = runs.get(message.id);
+                  const runStart = run?.start === message.id;
+                  const hidden = run !== undefined && !revealed.has(run.start);
                   return (
                     <Fragment key={message.id}>
                       {newDay && (
@@ -276,14 +291,27 @@ export function TextChannel({ channel, user, canModerate, direct }: TextChannelP
                           <span>New</span>
                         </li>
                       )}
-                      <MessageItem
-                        message={message}
-                        continued={continued && !newDay && !firstUnread}
-                        own={message.author.id === user.id}
-                        canDelete={message.author.id === user.id || canModerate}
-                        onEdit={chat.edit}
-                        onDelete={chat.remove}
-                      />
+                      {run && runStart && (
+                        <li className="blocked-messages">
+                          <Ban size={14} aria-hidden="true" />
+                          <span>
+                            {run.count} blocked {run.count === 1 ? "message" : "messages"}
+                          </span>
+                          <button className="link" onClick={() => toggleRun(run.start)}>
+                            {hidden ? "Show" : "Hide"}
+                          </button>
+                        </li>
+                      )}
+                      {!hidden && (
+                        <MessageItem
+                          message={message}
+                          continued={continued && !newDay && !firstUnread && !runStart}
+                          own={message.author.id === user.id}
+                          canDelete={message.author.id === user.id || canModerate}
+                          onEdit={chat.edit}
+                          onDelete={chat.remove}
+                        />
+                      )}
                     </Fragment>
                   );
                 })}

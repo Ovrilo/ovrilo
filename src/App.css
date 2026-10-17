@@ -2824,3 +2824,20 @@ button.small-button {
 .friends-add-ok {
   color: var(--success);
 }
+
+/* Messages from people you blocked, collapsed into one row per run. */
+.blocked-messages {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-5) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-2) 50%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.blocked-messages .link {
+  margin-left: auto;
+}

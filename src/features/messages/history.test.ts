@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { groupRows, type History, type Message, newestId, upsertMessage, visibleMessages, withAuthorProfile } from "./history";
+import {
+  blockedRuns,
+  groupRows,
+  type History,
+  type Message,
+  newestId,
+  upsertMessage,
+  visibleMessages,
+  withAuthorProfile,
+} from "./history";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 14, 12, minute)).toISOString();
 
@@ -89,5 +98,21 @@ describe("withAuthorProfile", () => {
     const data = history({ ids: [1], hasMore: false });
 
     expect(withAuthorProfile(data, "nobody", "X", null)).toBe(data);
+  });
+});
+
+describe("blockedRuns", () => {
+  it("groups consecutive messages by blocked authors and leaves everyone else alone", () => {
+    const eve = { id: "eve", displayName: "Eve", avatarAssetId: null };
+    const mal = { id: "mal", displayName: "Mal", avatarAssetId: null };
+    const runs = blockedRuns(
+      [message(1), message(2, { author: eve }), message(3, { author: mal }), message(4), message(5, { author: eve })],
+      new Set(["eve", "mal"]),
+    );
+    expect([...runs.keys()]).toEqual([2, 3, 5]);
+    expect(runs.get(2)).toEqual({ start: 2, count: 2 });
+    expect(runs.get(3)).toBe(runs.get(2));
+    expect(runs.get(5)).toEqual({ start: 5, count: 1 });
+    expect(blockedRuns([message(1)], new Set()).size).toBe(0);
   });
 });

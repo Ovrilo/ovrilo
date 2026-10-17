@@ -6,6 +6,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ### New
 - Direct messages with friends: press Message on a friend, or pick a conversation under Direct messages. Unread messages show on the Friends button.
+- Messages from people you blocked are collapsed in shared communities (Show reveals them), and they are muted for you in voice channels.
 - Friends: add people by their username, accept or decline requests, remove friends and block people. Open Friends at the top of the community list to see who is online; a badge shows new requests.
 
 ## [0.7.0] - 2026-10-16
