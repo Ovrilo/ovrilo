@@ -75,7 +75,10 @@ function closeViewer(entry: Viewer) {
   void entry.room.disconnect();
 }
 
-function acquireViewer(api: Api, channelId: string): Viewer {
+/** Where the watch-only grant comes from: a voice channel or a direct-message call. */
+export type WatchKind = "channel" | "call";
+
+function acquireViewer(api: Api, channelId: string, watch: WatchKind): Viewer {
   if (viewer?.channelId === channelId) {
     clearTimeout(viewer.closeTimer);
     viewer.users += 1;
@@ -84,7 +87,10 @@ function acquireViewer(api: Api, channelId: string): Viewer {
   if (viewer) closeViewer(viewer);
   const room = new Room({ adaptiveStream: false, dynacast: false });
   const connect = async () => {
-    const { data, error } = await api.POST("/channels/{channelId}/voice/watch", { params: { path: { channelId } } });
+    const { data, error } =
+      watch === "call"
+        ? await api.POST("/dms/{conversationId}/call/watch", { params: { path: { conversationId: channelId } } })
+        : await api.POST("/channels/{channelId}/voice/watch", { params: { path: { channelId } } });
     if (!data) throw error;
     await room.connect(data.serverUrl, data.token, { autoSubscribe: false });
   };
@@ -103,6 +109,7 @@ function releaseViewer(entry: Viewer) {
 
 export interface StreamPlayerProps {
   channelId: string;
+  watch?: WatchKind;
   /** The sharer's user ID (their SFU identity). */
   participantId: string;
   /** Shown in the top bar, for example "Ada" or "Your stream · Game". */
@@ -117,7 +124,7 @@ export interface StreamPlayerProps {
  * hidden, subscribe-only connection (`{userId}#viewer`, from `POST /channels/{id}/voice/watch`)
  * and subscribes to that share's video only; its sound plays in the voice engine.
  */
-export function StreamPlayer({ channelId, participantId, title, sound, onClose }: StreamPlayerProps) {
+export function StreamPlayer({ channelId, watch = "channel", participantId, title, sound, onClose }: StreamPlayerProps) {
   const api = useApi();
   const container = useRef<HTMLElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -150,7 +157,7 @@ export function StreamPlayer({ channelId, participantId, title, sound, onClose }
       subscribed.attach(video.current);
       fail("playing", null);
     };
-    const entry = acquireViewer(api, channelId);
+    const entry = acquireViewer(api, channelId, watch);
     const room = entry.room;
     const isTheShare = (publication: RemoteTrackPublication, participant: RemoteParticipant) =>
       participant.identity === participantId && publication.source === Track.Source.ScreenShare;

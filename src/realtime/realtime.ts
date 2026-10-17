@@ -11,6 +11,10 @@ export interface RealtimeEvents {
   PresenceChanged: { userId: string; online: boolean };
   /** contracts/events/README.md: the other person and what changed; refetch the lists. */
   FriendsChanged: { change: "requestReceived" | "friendAdded" | "updated"; user: Schemas["SocialUserResponse"] };
+  /** Calls in direct conversations (contracts/events/README.md). */
+  CallRinging: { conversationId: string; caller: { id: string; displayName: string; avatarAssetId: string | null } };
+  CallAccepted: { conversationId: string };
+  CallEnded: { conversationId: string; reason: "declined" | "cancelled" | "missed" };
   UserUpdated: { userId: string; displayName: string; avatarAssetId: string | null };
   CommunityUpdated: { communityId: string; name: string; description: string | null; iconAssetId: string | null };
   ChannelsChanged: { communityId: string; channelId: string; change: "created" | "updated" | "deleted" };

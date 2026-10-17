@@ -2841,3 +2841,99 @@ button.small-button {
 .blocked-messages .link {
   margin-left: auto;
 }
+
+/* ---------- Direct-message calls ---------- */
+
+/* The call sits above the conversation; messages keep the rest of the height. */
+.dm-call {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  height: min(48vh, 420px);
+  min-height: 220px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.dm-call > .call,
+.dm-call > .voice-lobby {
+  flex: 1;
+  min-height: 0;
+}
+
+.dm-call-status {
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.incoming-call {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 300px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-1);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+}
+
+.incoming-call .avatar {
+  animation: call-pulse 1.6s ease-in-out infinite;
+}
+
+.incoming-call-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.incoming-call-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.call-round {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.call-round.accept {
+  background: var(--success);
+}
+
+.call-round.decline {
+  background: var(--danger);
+}
+
+.call-round:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+@keyframes call-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--success) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incoming-call .avatar {
+    animation: none;
+  }
+}

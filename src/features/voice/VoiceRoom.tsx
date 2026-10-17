@@ -24,8 +24,18 @@ import { ParticipantMenu, type ParticipantMenuTarget } from "./ParticipantMenu";
 import { ScreenSharePicker } from "./ScreenSharePicker";
 import { clearVoiceError, useVoice, useVoiceQuality, voice, voiceAvailable } from "./voice";
 
+/** A one-to-one call in a direct conversation, shown with the same room view as a voice channel. */
+export interface CallRoom {
+  other: { id: string; displayName: string; avatarAssetId: string | null };
+  /** The call rings (who started it), and whether anyone is connected. */
+  ringingFrom: string | null;
+  occupied: boolean;
+}
+
 interface VoiceRoomProps {
-  channel: Schemas["ChannelResponse"];
+  /** A voice channel, or a direct conversation when `call` is set (its id is the room id). */
+  channel: Pick<Schemas["ChannelResponse"], "id" | "name" | "communityId">;
+  call?: CallRoom;
   user: Schemas["CurrentUserResponse"];
   /** Name of the voice channel the user is in, when it is a different one. */
   otherChannelName: string | null;
@@ -79,7 +89,7 @@ const PERSON_STATE: Record<NonNullable<Person["state"]>, { icon: LucideIcon; lab
 };
 
 /** Main pane of a voice channel (DESIGN.md §5.2): people and streams as tiles, one stream in focus. */
-export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomProps) {
+export function VoiceRoom({ channel, call, user, otherChannelName, join }: VoiceRoomProps) {
   const { snapshot, lastError, canShareScreen } = useVoice();
   const quality = useVoiceQuality();
   const [menu, setMenu] = useState<ParticipantMenuTarget | null>(null);
@@ -87,8 +97,10 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
   const [details, setDetails] = useState(false);
   const [focused, setFocused] = useState<Stream | null>(null);
   // Participants are user IDs from the voice engine; pictures come from the members list.
-  const avatars = useMemberAvatars(channel.communityId);
-  const voiceStates = useVoiceStates(channel.communityId);
+  const communityId = call ? null : channel.communityId;
+  const memberAvatars = useMemberAvatars(communityId);
+  const avatars = call ? new Map([[call.other.id, call.other.avatarAssetId]]) : memberAvatars;
+  const voiceStates = useVoiceStates(communityId);
   const here = voiceAvailable && snapshot.channelId === channel.id && snapshot.connection !== "disconnected";
 
   // Who is live: from the engine while we are in the room, otherwise from the server.
@@ -134,6 +146,7 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
       <StreamPlayer
         key={focused.id}
         channelId={channel.id}
+        watch={call ? "call" : "channel"}
         participantId={focused.id}
         title={focused.self ? `Your stream${focused.detail ? ` · ${focused.detail}` : ""}` : focused.name}
         sound={
@@ -208,12 +221,29 @@ export function VoiceRoom({ channel, user, otherChannelName, join }: VoiceRoomPr
         )}
         {!player && <h2>{channel.name}</h2>}
         <p className="muted">
+          {call
+            ? call.occupied
+              ? `${call.other.displayName} is in the call.`
+              : `Start a voice call with ${call.other.displayName}.`
+            : null}
           {otherChannelName
-            ? `You are in ${otherChannelName}. Switching leaves that channel.`
-            : "Join to talk with everyone in this channel."}
+            ? ` You are in ${otherChannelName}. ${call ? "Calling" : "Switching"} leaves that channel.`
+            : call
+              ? null
+              : "Join to talk with everyone in this channel."}
         </p>
         <button className="primary large" disabled={join.isPending} onClick={() => join.mutate(channel.id)}>
-          {join.isPending ? "Joining…" : otherChannelName ? "Switch to this channel" : "Join voice"}
+          {join.isPending
+            ? call
+              ? "Connecting…"
+              : "Joining…"
+            : call
+              ? call.occupied
+                ? "Join call"
+                : "Call"
+              : otherChannelName
+                ? "Switch to this channel"
+                : "Join voice"}
         </button>
         {errors}
       </div>
