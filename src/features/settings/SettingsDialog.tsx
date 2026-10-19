@@ -9,6 +9,11 @@ import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { AboutSettings } from "./AboutSettings";
+import {
+  desktopNotificationsAvailable,
+  setNotificationSettings,
+  useNotificationSettings,
+} from "../sounds/desktopNotifications";
 import { playSound, setSoundSettings, SOUND_LABELS, type SoundKind, useSoundSettings } from "../sounds/sounds";
 import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
@@ -312,11 +317,43 @@ const SOUND_GROUPS: { title: string; kinds: SoundKind[] }[] = [
 /** Which sounds play and how loud; saved on this computer. */
 function SoundSettingsPage() {
   const settings = useSoundSettings();
+  const notifications = useNotificationSettings();
   const toggle = (kind: SoundKind, on: boolean) =>
     setSoundSettings({ ...settings, off: on ? settings.off.filter((k) => k !== kind) : [...settings.off, kind] });
 
   return (
     <div className="settings-page">
+      {desktopNotificationsAvailable && (
+        <fieldset className="settings-group">
+          <legend>Windows notifications</legend>
+          <ul className="sound-list">
+            <li className="sound-row">
+              <label className="sound-toggle">
+                <input
+                  type="checkbox"
+                  checked={notifications.enabled}
+                  onChange={(e) => setNotificationSettings({ ...notifications, enabled: e.target.checked })}
+                />
+                <span>Show a notification for new direct and group messages and for calls</span>
+              </label>
+            </li>
+            <li className="sound-row">
+              <label className="sound-toggle">
+                <input
+                  type="checkbox"
+                  checked={notifications.preview}
+                  disabled={!notifications.enabled}
+                  onChange={(e) => setNotificationSettings({ ...notifications, preview: e.target.checked })}
+                />
+                <span>Include the message text</span>
+              </label>
+            </li>
+          </ul>
+          <p className="muted small">
+            Only while Ovrilo is in the background or that conversation is not open. Click one to open the conversation.
+          </p>
+        </fieldset>
+      )}
       <section className="settings-group" aria-labelledby="settings-sound-volume">
         <h3 id="settings-sound-volume">Sounds</h3>
         <label className="sound-volume">

@@ -32,6 +32,7 @@ import { FriendsView } from "../friends/FriendsView";
 import { TextChannel } from "../messages/TextChannel";
 import { type ChannelUnread, isUnread, unreadLabel, useCommunitiesWithUnread, useUnread, useUnreadSync } from "../messages/unread";
 import { SettingsDialog } from "../settings/SettingsDialog";
+import { useDesktopNotifications } from "../sounds/desktopNotifications";
 import { useSoundCues } from "../sounds/useSoundCues";
 import { UpdateBanner } from "../update/UpdateBanner";
 import { useJoinVoice } from "../voice/useJoinVoice";
@@ -106,6 +107,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
     setHome(true);
     setDmId(conversationId);
   };
+  useDesktopNotifications(user.id, home ? dmId : null, openConversation);
   const messageFriend = (userId: string) =>
     openDirectMessage.mutate(userId, { onSuccess: (conversation) => setDmId(conversation.id) });
 
