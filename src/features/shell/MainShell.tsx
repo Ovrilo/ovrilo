@@ -24,7 +24,7 @@ import { useCallActions, useCallState } from "../friends/calls";
 import { type Conversation, GROUP_MAX_MEMBERS, type GroupConversation, useConversations, useDirectMessagesSync, useOpenDirectMessage } from "../friends/dms";
 import { AddToGroupDialog, CreateGroupDialog, LeaveGroupDialog, RenameGroupDialog } from "../friends/GroupDialogs";
 import { GroupAvatar, GroupMembersPanel } from "../friends/GroupParts";
-import { OpenCommunityContext } from "../friends/invites";
+import { OpenCommunityContext, useInviteLinks } from "../friends/invites";
 import { OpenConversationContext } from "../friends/PersonActions";
 import { IncomingCall, type IncomingCallInfo } from "../friends/IncomingCall";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
@@ -53,6 +53,7 @@ import {
   DeleteCommunityDialog,
   EditChannelDialog,
   InviteDialog,
+  InviteLinkDialog,
   JoinCommunityDialog,
   LeaveCommunityDialog,
 } from "./dialogs";
@@ -74,6 +75,7 @@ type OpenDialog =
   | { kind: "createChannel"; type: Channel["type"] }
   | { kind: "editChannel" | "deleteChannel"; channel: Channel }
   | { kind: "createGroup" }
+  | { kind: "inviteLink"; code: string }
   | { kind: "addToGroup" | "renameGroup"; group: GroupConversation }
   | { kind: "leaveGroup"; conversation: Conversation; userId: string; userName: string }
   | null;
@@ -108,6 +110,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
     setDmId(conversationId);
   };
   useDesktopNotifications(user.id, home ? dmId : null, openConversation);
+  useInviteLinks((code) => setDialog({ kind: "inviteLink", code }));
   const messageFriend = (userId: string) =>
     openDirectMessage.mutate(userId, { onSuccess: (conversation) => setDmId(conversation.id) });
 
@@ -653,6 +656,9 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
           onAction={onCommunityAction}
           onClose={() => setCommunityMenu(null)}
         />
+      )}
+      {typeof dialog === "object" && dialog?.kind === "inviteLink" && (
+        <InviteLinkDialog code={dialog.code} onClose={() => setDialog(null)} />
       )}
       {typeof dialog === "object" && dialog?.kind === "createGroup" && (
         <CreateGroupDialog onClose={() => setDialog(null)} onCreated={(id) => setDmId(id)} />

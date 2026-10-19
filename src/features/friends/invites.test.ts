@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inviteCode, inviteMessage, withoutInviteLink } from "./invites";
+import { inviteCode, inviteLink, inviteMessage, parseInvite, withoutInviteLink } from "./invites";
 
 describe("invitation links in messages", () => {
   it("round-trips the code through the message text", () => {
@@ -13,5 +13,20 @@ describe("invitation links in messages", () => {
     expect(inviteCode("see ovrilo://invite/short")).toBeNull();
     expect(inviteCode("ovrilo://invite/Ab3dEf6hIj9kX")).toBeNull();
     expect(inviteCode(null)).toBeNull();
+  });
+});
+
+describe("parseInvite", () => {
+  it("accepts a code, an ovrilo:// link and a website link", () => {
+    expect(parseInvite("  Ab3dEf6hIj9k ")).toBe("Ab3dEf6hIj9k");
+    expect(parseInvite("ovrilo://invite/Ab3dEf6hIj9k")).toBe("Ab3dEf6hIj9k");
+    expect(parseInvite("ovrilo://invite/Ab3dEf6hIj9k/")).toBe("Ab3dEf6hIj9k");
+    expect(parseInvite(inviteLink("Ab3dEf6hIj9k"))).toBe("Ab3dEf6hIj9k");
+  });
+
+  it("rejects anything else", () => {
+    expect(parseInvite("hello")).toBeNull();
+    expect(parseInvite("https://example.com/invite.html#Ab3dEf6hIj9kX")).toBeNull();
+    expect(parseInvite("ovrilo://invite/short")).toBeNull();
   });
 });

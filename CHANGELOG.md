@@ -5,6 +5,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 ## [Unreleased]
 
 ### New
+- Invite links: Invite now offers Copy link next to the code. Opening a link starts Ovrilo (or brings it forward) and shows the community with a Join button, and Join with an invitation accepts a link as well as a code.
 - Windows notifications for new direct and group messages and for incoming calls while Ovrilo is in the background. Click one to open the conversation. Turn them off, or hide the message text, under Settings → Notifications.
 - Settings → About shows the app version and the open-source software Ovrilo is built with, each with its license.
 - Click or right-click someone in a member list or a voice room to message them, add them as a friend or block them.

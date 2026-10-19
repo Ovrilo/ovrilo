@@ -8,7 +8,7 @@ import { Dialog } from "../../components/Dialog";
 import { PicturePicker } from "../../components/PicturePicker";
 import { Avatar, CommunityIcon, Select } from "../../components/ui";
 import { useFriends } from "../friends/friends";
-import { useInviteFriend } from "../friends/invites";
+import { InviteCard, inviteLink, parseInvite, useInviteFriend } from "../friends/invites";
 import { uploadImage } from "../../media/upload";
 import { dropCommunity, queryKeys, useMembers } from "./queries";
 
@@ -247,12 +247,14 @@ export function JoinCommunityDialog({ onClose, onJoined }: DialogProps & { onJoi
       <form
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
-          mutation.mutate(String(new FormData(event.currentTarget).get("code") ?? "").trim());
+          const input = String(new FormData(event.currentTarget).get("code") ?? "");
+          // A pasted link works too; anything else goes to the server, which says it is invalid.
+          mutation.mutate(parseInvite(input) ?? input.trim());
         }}
       >
         <label>
-          Invitation code
-          <input name="code" required minLength={12} maxLength={12} autoComplete="off" spellCheck={false} autoFocus />
+          Invitation code or link
+          <input name="code" required maxLength={300} autoComplete="off" spellCheck={false} autoFocus />
         </label>
         <FormError error={mutation.error} />
         <DialogActions onClose={onClose} busy={mutation.isPending} submitLabel="Join" />
@@ -264,7 +266,7 @@ export function JoinCommunityDialog({ onClose, onJoined }: DialogProps & { onJoi
 export function InviteDialog({ onClose, community }: DialogProps & { community: { id: string; name: string } }) {
   const communityId = community.id;
   const api = useApi();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const mutation = useMutation({
     mutationFn: (maxUses: number) =>
       unwrap(
@@ -283,7 +285,7 @@ export function InviteDialog({ onClose, community }: DialogProps & { community: 
       {invitation ? (
         <>
           <p className="muted">
-            Share this code. It works {invitation.maxUses === 1 ? "once" : `${invitation.maxUses} times`} and expires{" "}
+            Share the link or the code. It works {invitation.maxUses === 1 ? "once" : `${invitation.maxUses} times`} and expires{" "}
             {new Date(invitation.expiresAt).toLocaleString()}. It cannot be shown again.
           </p>
           <div className="invite-code">
@@ -292,10 +294,19 @@ export function InviteDialog({ onClose, community }: DialogProps & { community: 
               type="button"
               onClick={async () => {
                 await navigator.clipboard.writeText(invitation.code);
-                setCopied(true);
+                setCopied("code");
               }}
             >
-              {copied ? "Copied" : "Copy"}
+              {copied === "code" ? "Copied" : "Copy code"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(inviteLink(invitation.code));
+                setCopied("link");
+              }}
+            >
+              {copied === "link" ? "Copied" : "Copy link"}
             </button>
           </div>
           <div className="dialog-actions">
@@ -386,6 +397,20 @@ function InviteFriendsList({ community }: { community: { id: string; name: strin
       </ul>
       <FormError error={invite.error} />
     </div>
+  );
+}
+
+/** An invitation opened from a link: the community it leads to, and Join. */
+export function InviteLinkDialog({ code, onClose }: DialogProps & { code: string }) {
+  return (
+    <Dialog title="Join a community" onClose={onClose}>
+      <InviteCard code={code} own={false} onJoined={onClose} />
+      <div className="dialog-actions">
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Dialog>
   );
 }
 
