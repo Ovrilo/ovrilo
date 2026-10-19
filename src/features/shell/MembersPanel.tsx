@@ -3,6 +3,8 @@ import { Crown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { PersonMenu, type PersonMenuTarget } from "../friends/PersonActions";
+import { useMyStatus } from "../friends/myStatus";
+import { applyPresence, PRESENCE_LABEL, type PresenceMap, presenceMap, presenceClass } from "../friends/presence";
 
 import type { Schemas } from "../../api/client";
 import { useRealtime } from "../../auth/SessionContext";
@@ -17,23 +19,18 @@ function memberName(member: Member): string {
   return member.nickname ?? member.displayName;
 }
 
-/** Who in the community is online right now, kept current over the realtime connection. */
-function usePresence(communityId: string): ReadonlySet<string> {
+/** Who in the community is online right now and how, kept current over the realtime connection. */
+function usePresence(communityId: string): PresenceMap {
   const realtime = useRealtime();
   const queryClient = useQueryClient();
-  const [online, setOnline] = useState<ReadonlySet<string>>(() => new Set());
+  const [online, setOnline] = useState<PresenceMap>(() => new Map());
 
   useEffect(() => {
-    setOnline(new Set());
-    const unsubscribe = realtime.subscribeCommunity(communityId, (ids) => setOnline(new Set(ids)));
-    const off = realtime.on("PresenceChanged", ({ userId, online: isOnline }) => {
-      setOnline((current) => {
-        if (current.has(userId) === isOnline) return current;
-        const next = new Set(current);
-        if (isOnline) next.add(userId);
-        else next.delete(userId);
-        return next;
-      });
+    setOnline(new Map());
+    const unsubscribe = realtime.subscribeCommunity(communityId, (present) => setOnline(presenceMap(present)));
+    const off = realtime.on("PresenceChanged", (event) => {
+      const { userId, online: isOnline } = event;
+      setOnline((current) => applyPresence(current, event));
       // Someone we have never listed may have just joined the community.
       const members = queryClient.getQueryData<Member[]>(queryKeys.members(communityId));
       if (isOnline && members && !members.some((m) => m.userId === userId)) {
@@ -58,8 +55,10 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
     if (member.userId === selfId) return;
     setMenu({ person: { id: member.userId, displayName: memberName(member), username: member.username }, x, y });
   };
-  // We are online whenever we can see this list, even before the first snapshot arrives.
-  const isOnline = (m: Member) => m.userId === selfId || online.has(m.userId);
+  // You appear as you chose (others' view of you may lag a moment); invisible looks offline.
+  const myStatus = useMyStatus();
+  const statusOf = (m: Member) => (m.userId === selfId ? (myStatus === "invisible" ? null : myStatus) : (online.get(m.userId) ?? null));
+  const isOnline = (m: Member) => statusOf(m) !== null;
 
   const all = members.data ?? [];
   const groups = [
@@ -99,9 +98,12 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
                     <span className="presence-avatar">
                       <Avatar name={memberName(member)} assetId={member.avatarAssetId} size="sm" />
                       <span
-                        className={`presence-dot${group.label === "Online" ? " online" : ""}`}
+                        className={presenceClass(statusOf(member))}
                         role="img"
-                        aria-label={group.label}
+                        aria-label={(() => {
+                          const status = statusOf(member);
+                          return status ? PRESENCE_LABEL[status] : "Offline";
+                        })()}
                       />
                     </span>
                     <span className="member-name" title={`@${member.username}`}>

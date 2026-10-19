@@ -3303,3 +3303,63 @@ label.sound-toggle {
 .selectable {
   user-select: text;
 }
+
+.presence-dot.away {
+  background: var(--warning);
+}
+
+.presence-dot.dnd {
+  background: var(--danger);
+}
+
+/* ---------- Your status ---------- */
+
+.user-bar-status {
+  flex: none;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.user-bar-status .presence-dot {
+  border-color: var(--surface-1);
+}
+
+.context-menu:has(.status-option) {
+  min-width: 270px;
+}
+
+.status-option {
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding-block: 6px;
+  text-align: left;
+}
+
+.status-option-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.status-option-text .small {
+  font-weight: 400;
+}
+
+/* The menu's swatch reuses the presence colours without the avatar positioning. */
+.presence-dot.status-swatch {
+  position: static;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 0;
+}
+
+.presence-dot.status-swatch:not(.online, .away, .dnd) {
+  box-shadow: inset 0 0 0 2px var(--text-secondary);
+  background: transparent;
+}

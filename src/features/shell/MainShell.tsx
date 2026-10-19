@@ -25,6 +25,7 @@ import { type Conversation, GROUP_MAX_MEMBERS, type GroupConversation, useConver
 import { AddToGroupDialog, CreateGroupDialog, LeaveGroupDialog, RenameGroupDialog } from "../friends/GroupDialogs";
 import { GroupAvatar, GroupMembersPanel } from "../friends/GroupParts";
 import { OpenCommunityContext, useInviteLinks } from "../friends/invites";
+import { useIdleReporting, useInitialStatus } from "../friends/myStatus";
 import { OpenConversationContext } from "../friends/PersonActions";
 import { IncomingCall, type IncomingCallInfo } from "../friends/IncomingCall";
 import { useFriendRequests, useFriendsSync } from "../friends/friends";
@@ -97,6 +98,8 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   useFriendsSync();
   useDirectMessagesSync();
   useMuteBlockedInVoice();
+  useInitialStatus(user.availability);
+  useIdleReporting();
   useSoundCues(user.id, home ? dmId : null);
   const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
   const conversations = useConversations(user.id);

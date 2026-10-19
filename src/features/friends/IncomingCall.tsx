@@ -2,6 +2,7 @@ import { Phone, PhoneOff } from "lucide-react";
 import { useEffect } from "react";
 
 import { Avatar } from "../../components/ui";
+import { useMyStatus } from "./myStatus";
 
 export interface IncomingCallInfo {
   conversationId: string;
@@ -55,7 +56,8 @@ export function IncomingCall({
   onAccept: () => void;
   onDecline: () => void;
 }) {
-  useRingtone(true);
+  // Do not disturb: the card still shows, silently.
+  useRingtone(useMyStatus() !== "doNotDisturb");
   return (
     <div className="incoming-call" role="alertdialog" aria-label={`${call.caller.displayName} is calling`}>
       <Avatar name={call.caller.displayName} assetId={call.caller.avatarAssetId} size="lg" />

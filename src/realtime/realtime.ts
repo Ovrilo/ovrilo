@@ -8,7 +8,8 @@ export interface RealtimeEvents {
   MessageEdited: Schemas["MessageResponse"];
   MessageDeleted: Schemas["MessageResponse"];
   ReadStateUpdated: Schemas["ReadStateResponse"];
-  PresenceChanged: { userId: string; online: boolean };
+  /** `status` is null when offline; older servers omit it (then online means "online"). */
+  PresenceChanged: { userId: string; online: boolean; status?: Presence | null };
   /** contracts/events/README.md: the other person and what changed; refetch the lists. */
   FriendsChanged: { change: "requestReceived" | "friendAdded" | "updated"; user: Schemas["SocialUserResponse"] };
   /** Calls in direct and group conversations (contracts/events/README.md). */
@@ -28,8 +29,17 @@ export interface RealtimeEvents {
   CommunityDeleted: { communityId: string };
 }
 
-/** Members of a community online right now (SubscribeCommunity). */
-type PresenceSnapshot = (onlineUserIds: string[]) => void;
+/** What a connected person shows to others. */
+export type Presence = "online" | "away" | "doNotDisturb";
+
+/** People online right now and how (SubscribeCommunity, GetFriendsPresence). */
+export type PresenceEntry = { userId: string; status: Presence };
+type PresenceSnapshot = (present: PresenceEntry[]) => void;
+type PresenceResponse = { onlineUserIds: string[]; statuses?: PresenceEntry[] | null };
+
+/** Snapshots from older servers have no statuses: everyone listed is online. */
+const presentFrom = (snapshot: PresenceResponse): PresenceEntry[] =>
+  snapshot.statuses ?? snapshot.onlineUserIds.map((userId) => ({ userId, status: "online" }));
 
 export type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -43,6 +53,8 @@ export class RealtimeClient {
   private connection: HubConnection | null = null;
   private readonly channels = new Map<string, number>();
   private readonly communities = new Map<string, Set<PresenceSnapshot>>();
+  /** Whether this computer is idle, as last reported by the app. */
+  private idle = false;
   private readonly handlers = new Map<string, Set<(payload: unknown) => void>>();
   private readonly resyncListeners = new Set<() => void>();
   private readonly statusListeners = new Set<() => void>();
@@ -125,14 +137,22 @@ export class RealtimeClient {
   }
 
   /** Friends online now, or null while disconnected. Changes arrive as `PresenceChanged`. */
-  async getFriendsPresence(): Promise<string[] | null> {
+  async getFriendsPresence(): Promise<PresenceEntry[] | null> {
     const connection = this.connection;
     if (connection?.state !== HubConnectionState.Connected) return null;
     try {
-      const snapshot = await connection.invoke<{ onlineUserIds: string[] }>("GetFriendsPresence");
-      return snapshot.onlineUserIds;
+      return presentFrom(await connection.invoke<PresenceResponse>("GetFriendsPresence"));
     } catch {
       return null;
+    }
+  }
+
+  /** Tells the server whether this computer is idle; repeated after every reconnect. */
+  setIdle(idle: boolean): void {
+    if (this.idle === idle) return;
+    this.idle = idle;
+    if (this.connection?.state === HubConnectionState.Connected) {
+      void this.connection.invoke("SetIdle", idle).catch(() => undefined);
     }
   }
 
@@ -200,6 +220,7 @@ export class RealtimeClient {
     await Promise.all([
       ...[...this.channels.keys()].map((id) => connection.invoke("SubscribeChannel", id).catch(() => undefined)),
       ...[...this.communities].map(([id, listeners]) => this.watchCommunity(connection, id, listeners)),
+      ...(this.idle ? [connection.invoke("SetIdle", true).catch(() => undefined)] : []),
     ]);
     this.setStatus("connected");
     this.resyncListeners.forEach((listener) => listener());
@@ -207,8 +228,8 @@ export class RealtimeClient {
 
   private async watchCommunity(connection: HubConnection, communityId: string, listeners: Set<PresenceSnapshot>) {
     try {
-      const snapshot = await connection.invoke<{ onlineUserIds: string[] } | null>("SubscribeCommunity", communityId);
-      if (snapshot) listeners.forEach((listener) => listener(snapshot.onlineUserIds));
+      const snapshot = await connection.invoke<PresenceResponse | null>("SubscribeCommunity", communityId);
+      if (snapshot) listeners.forEach((listener) => listener(presentFrom(snapshot)));
     } catch {
       // The next reconnect subscribes again.
     }

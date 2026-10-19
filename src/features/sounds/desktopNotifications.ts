@@ -6,6 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useRealtime } from "../../auth/SessionContext";
 import { dmKey, type DirectConversation, type GroupConversation, groupKey, groupTitle } from "../friends/dms";
 import { type BlockedUser, friendKeys } from "../friends/friends";
+import { isDoNotDisturb } from "../friends/myStatus";
 import { useVoice } from "../voice/voice";
 import { messageCue } from "./cues";
 
@@ -83,7 +84,7 @@ export function useDesktopNotifications(selfId: string, openConversationId: stri
     const focused = () => document.hasFocus() && !document.hidden;
 
     const offMessage = realtime.on("MessageCreated", (message) => {
-      if (!settings.enabled) return;
+      if (!settings.enabled || isDoNotDisturb()) return;
       const channelId = message.channelId;
       const dm = queryClient.getQueryData<DirectConversation[]>(dmKey)?.find((c) => c.id === channelId);
       const group = queryClient.getQueryData<GroupConversation[]>(groupKey)?.find((g) => g.id === channelId);
@@ -113,7 +114,7 @@ export function useDesktopNotifications(selfId: string, openConversationId: stri
     });
 
     const offCall = realtime.on("CallRinging", (ring) => {
-      if (!settings.enabled || focused()) return;
+      if (!settings.enabled || isDoNotDisturb() || focused()) return;
       const where = ring.isGroup ? (ring.groupName ?? "your group") : "you";
       show(`${ring.caller.displayName} is calling ${where}`, "Open Ovrilo to answer.", ring.conversationId);
     });
