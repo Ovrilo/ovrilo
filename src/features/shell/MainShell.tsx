@@ -396,7 +396,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
             <header className="channel-header">
               {openGroup ? (
                 <>
-                  <GroupAvatar others={openDm.others} />
+                  <GroupAvatar />
                   <h1>
                     <button
                       className="group-title-button"
@@ -511,7 +511,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
                   unread: dmUnread(openDm),
                   group: openGroup !== null,
                   picture: openGroup ? (
-                    <GroupAvatar others={openDm.others} size="lg" />
+                    <GroupAvatar size="lg" />
                   ) : (
                     <Avatar name={openDm.title} assetId={openDm.others[0]?.avatarAssetId ?? null} size="lg" />
                   ),
@@ -922,7 +922,7 @@ function DirectMessageList({
                 onClick={() => onSelect(c.id)}
               >
                 {c.group ? (
-                  <GroupAvatar others={c.others} />
+                  <GroupAvatar />
                 ) : (
                   <Avatar name={c.title} assetId={c.others[0]?.avatarAssetId ?? null} size="xs" />
                 )}

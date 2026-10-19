@@ -1,18 +1,16 @@
-import { Crown, UserMinus } from "lucide-react";
+import { Crown, UserMinus, Users } from "lucide-react";
 
 import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
 
-/** Two members' pictures, overlapped: how a group shows in lists and headers. */
-export function GroupAvatar({ others, size = "xs" }: { others: readonly ConversationUser[]; size?: "xs" | "sm" | "lg" }) {
-  const [first, second] = others;
-  if (!first) return <Avatar name="?" assetId={null} size={size} />;
-  if (!second) return <Avatar name={first.displayName} assetId={first.avatarAssetId} size={size} />;
+const GROUP_ICON_SIZE = { xs: 12, sm: 16, lg: 30 } as const;
+
+/** A group's picture: a people symbol, sized like an avatar (the member list shows who is in it). */
+export function GroupAvatar({ size = "xs" }: { size?: "xs" | "sm" | "lg" }) {
   return (
-    <span className={`group-avatar group-avatar-${size}`} aria-hidden="true">
-      <Avatar name={first.displayName} assetId={first.avatarAssetId} size={size} />
-      <Avatar name={second.displayName} assetId={second.avatarAssetId} size={size} />
+    <span className={`avatar avatar-${size} group-avatar`} aria-hidden="true">
+      <Users size={GROUP_ICON_SIZE[size]} />
     </span>
   );
 }
