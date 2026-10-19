@@ -3,6 +3,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 
 import { problemMessage } from "../../api/client";
 import { Avatar, IconButton } from "../../components/ui";
+import type { Presence } from "../../realtime/realtime";
 import {
   type Friend,
   type FriendRequest,
@@ -13,6 +14,7 @@ import {
   useFriends,
   useFriendsPresence,
 } from "./friends";
+import { PRESENCE_LABEL, type PresenceMap, presenceClass } from "./presence";
 
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
@@ -144,7 +146,7 @@ function FriendList({
   onMessage,
 }: {
   friends: Friend[];
-  online: ReadonlySet<string>;
+  online: PresenceMap;
   loading: boolean;
   empty: string;
   heading: string;
@@ -182,7 +184,12 @@ function FriendList({
       </h2>
       <ul className="friends-list">
         {shown.map((f) => (
-          <PersonRow key={f.user.id} user={f.user} online={online.has(f.user.id)} status={online.has(f.user.id) ? "Online" : "Offline"}>
+          <PersonRow
+            key={f.user.id}
+            user={f.user}
+            presence={online.get(f.user.id) ?? null}
+            status={PRESENCE_LABEL[online.get(f.user.id) ?? "offline"]}
+          >
             <IconButton icon={MessageCircle} label={`Message ${f.user.displayName}`} onClick={() => onMessage(f.user.id)} />
             <IconButton
               icon={UserMinus}
@@ -267,20 +274,21 @@ function BlockedList({ blocked, loading }: { blocked: { user: SocialUser }[]; lo
 function PersonRow({
   user,
   status,
-  online,
+  presence,
   children,
 }: {
   user: SocialUser;
   status: string;
-  online?: boolean;
+  /** Shown as a dot when given: a status, or null for offline. */
+  presence?: Presence | null;
   children: ReactNode;
 }) {
   return (
     <li className="friend-row avatar-hover-scope">
       <span className="presence-avatar">
         <Avatar name={user.displayName} assetId={user.avatarAssetId} size="md" />
-        {online !== undefined && (
-          <span className={`presence-dot${online ? " online" : ""}`} role="img" aria-label={online ? "Online" : "Offline"} />
+        {presence !== undefined && (
+          <span className={presenceClass(presence)} role="img" aria-label={presence ? PRESENCE_LABEL[presence] : "Offline"} />
         )}
       </span>
       <span className="friend-text">

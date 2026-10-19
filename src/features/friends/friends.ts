@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { useApi, useRealtime } from "../../auth/SessionContext";
+import { applyPresence, type PresenceMap, presenceMap } from "./presence";
 
 export type Friend = Schemas["FriendResponse"];
 export type FriendRequest = Schemas["FriendRequestResponse"];
@@ -64,29 +65,24 @@ export function useFriendsSync() {
   }, [realtime, queryClient]);
 }
 
-/** Which friends are online: a snapshot after (re)connecting and after friend changes, then PresenceChanged. */
-export function useFriendsPresence(): ReadonlySet<string> {
+/**
+ * Which friends are online and how: a snapshot after (re)connecting and after friend changes,
+ * then PresenceChanged.
+ */
+export function useFriendsPresence(): PresenceMap {
   const realtime = useRealtime();
-  const [online, setOnline] = useState<ReadonlySet<string>>(() => new Set());
+  const [online, setOnline] = useState<PresenceMap>(() => new Map());
   useEffect(() => {
     let current = true;
     const snapshot = () =>
-      void realtime.getFriendsPresence().then((ids) => {
-        if (current && ids) setOnline(new Set(ids));
+      void realtime.getFriendsPresence().then((present) => {
+        if (current && present) setOnline(presenceMap(present));
       });
     snapshot();
     const offs = [
       realtime.onResync(snapshot),
       realtime.on("FriendsChanged", snapshot),
-      realtime.on("PresenceChanged", ({ userId, online: isOnline }) =>
-        setOnline((previous) => {
-          if (previous.has(userId) === isOnline) return previous;
-          const next = new Set(previous);
-          if (isOnline) next.add(userId);
-          else next.delete(userId);
-          return next;
-        }),
-      ),
+      realtime.on("PresenceChanged", (event) => setOnline((previous) => applyPresence(previous, event))),
     ];
     return () => {
       current = false;

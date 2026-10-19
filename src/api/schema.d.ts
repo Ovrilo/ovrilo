@@ -193,6 +193,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets the status others see: online, away, doNotDisturb or invisible (looks offline). Kept across sessions and devices. */
+        put: operations["SetStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -821,6 +838,11 @@ export interface components {
             sessionExpiresAt: string;
             user: components["schemas"]["CurrentUserResponse"];
         };
+        /**
+         * @default online
+         * @enum {unknown}
+         */
+        Availability: "online" | "away" | "doNotDisturb" | "invisible";
         BlockedUserResponse: {
             user: components["schemas"]["SocialUserResponse"];
             /** Format: date-time */
@@ -921,6 +943,7 @@ export interface components {
             createdAt: string;
             /** Format: uuid */
             avatarAssetId: null | string;
+            availability?: components["schemas"]["Availability"];
         };
         DirectConversationResponse: {
             /** Format: uuid */
@@ -1141,6 +1164,9 @@ export interface components {
         SetCommunityIconRequest: {
             /** Format: uuid */
             assetId: string;
+        };
+        SetStatusRequest: {
+            availability: components["schemas"]["Availability"];
         };
         SocialUserResponse: {
             /** Format: uuid */
@@ -1775,6 +1801,35 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    SetStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

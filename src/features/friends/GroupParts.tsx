@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
+import { useMyStatus } from "./myStatus";
 import { PersonMenu, type PersonMenuTarget } from "./PersonActions";
+import { PRESENCE_LABEL, presenceClass } from "./presence";
 
 const GROUP_ICON_SIZE = { xs: 12, sm: 16, lg: 30 } as const;
 
@@ -32,6 +34,7 @@ export function GroupMembersPanel({
   onRemove?: (member: ConversationUser) => void;
 }) {
   const online = useFriendsPresence();
+  const myStatus = useMyStatus();
   const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
   const openMenu = (member: ConversationUser, x: number, y: number) => {
     if (member.id === selfId) return;
@@ -43,7 +46,7 @@ export function GroupMembersPanel({
         <h2>Members — {group.members.length}</h2>
         <ul>
           {group.members.map((member) => {
-            const isOnline = member.id === selfId || online.has(member.id);
+            const status = member.id === selfId ? (myStatus === "invisible" ? null : myStatus) : (online.get(member.id) ?? null);
             return (
               <li
                 key={member.id}
@@ -67,7 +70,7 @@ export function GroupMembersPanel({
               >
                 <span className="presence-avatar">
                   <Avatar name={member.displayName} assetId={member.avatarAssetId} size="sm" />
-                  {isOnline && <span className="presence-dot online" role="img" aria-label="Online" />}
+                  {status && <span className={presenceClass(status)} role="img" aria-label={PRESENCE_LABEL[status]} />}
                 </span>
                 <span className="member-name" title={`@${member.username}`}>
                   {member.displayName}

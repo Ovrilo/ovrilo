@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRealtime } from "../../auth/SessionContext";
 import { dmKey, type DirectConversation, type GroupConversation, groupKey } from "../friends/dms";
 import { type BlockedUser, friendKeys } from "../friends/friends";
+import { isDoNotDisturb } from "../friends/myStatus";
 import { useVoice } from "../voice/voice";
 import { messageCue, voiceCues } from "./cues";
 import { playSound } from "./sounds";
@@ -53,7 +54,7 @@ export function useSoundCues(selfId: string, openConversationId: string | null) 
         deafened: deafened.current,
       });
       const now = Date.now();
-      if (play && now - lastPlayed >= MESSAGE_SOUND_GAP_MS) {
+      if (play && !isDoNotDisturb() && now - lastPlayed >= MESSAGE_SOUND_GAP_MS) {
         lastPlayed = now;
         playSound("message");
       }
