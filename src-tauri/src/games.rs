@@ -266,6 +266,26 @@ mod tests {
         println!("{} processes, games: {games:?}", running_paths().len());
     }
 
+    /// Manual timing: `cargo test --release --lib games::tests::times_a_scan -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "timing on this computer"]
+    fn times_a_scan() {
+        let first = std::time::Instant::now();
+        let count = running_paths().len();
+        let first = first.elapsed();
+        let later = std::time::Instant::now();
+        for _ in 0..20 {
+            let _ = running_paths()
+                .iter()
+                .filter_map(|p| classify(p, &[]))
+                .count();
+        }
+        println!(
+            "{count} processes; first scan {first:?}; later scans {:?} each",
+            later.elapsed() / 20
+        );
+    }
+
     #[test]
     fn library_folders_name_the_game() {
         assert_eq!(
