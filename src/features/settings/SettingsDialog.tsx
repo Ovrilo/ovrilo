@@ -1,4 +1,4 @@
-import { AudioLines, Headphones, Keyboard, LogOut, type LucideIcon, Mic, RefreshCw } from "lucide-react";
+import { AudioLines, Headphones, Keyboard, LogOut, type LucideIcon, Mic, Play, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { Schemas } from "../../api/client";
@@ -8,9 +8,10 @@ import { PicturePicker } from "../../components/PicturePicker";
 import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
+import { playSound, setSoundSettings, SOUND_LABELS, type SoundKind, useSoundSettings } from "../sounds/sounds";
 import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
-type Tab = "audio" | "account";
+type Tab = "audio" | "notifications" | "account";
 
 export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserResponse"]; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("audio");
@@ -21,12 +22,15 @@ export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserRe
           <button role="tab" aria-selected={tab === "audio"} onClick={() => setTab("audio")}>
             Voice & audio
           </button>
+          <button role="tab" aria-selected={tab === "notifications"} onClick={() => setTab("notifications")}>
+            Notifications
+          </button>
           <button role="tab" aria-selected={tab === "account"} onClick={() => setTab("account")}>
             Account
           </button>
         </nav>
         <div className="settings-body" role="tabpanel">
-          {tab === "audio" ? <AudioSettings /> : <AccountSettings user={user} />}
+          {tab === "audio" ? <AudioSettings /> : tab === "notifications" ? <SoundSettingsPage /> : <AccountSettings user={user} />}
         </div>
       </div>
       <div className="dialog-actions">
@@ -284,6 +288,73 @@ function KeyCapture({ onKey, onCancel }: { onKey: (key: PushToTalkKey) => void; 
     <span className="key-capture" role="status">
       Press a key or mouse side button… <span className="muted small">(Esc to cancel)</span>
     </span>
+  );
+}
+
+const SOUND_GROUPS: { title: string; kinds: SoundKind[] }[] = [
+  { title: "Messages", kinds: ["message"] },
+  { title: "Voice rooms", kinds: ["join", "leave", "connect", "disconnect"] },
+  { title: "Your microphone", kinds: ["mute", "unmute", "deafen", "undeafen"] },
+];
+
+/** Which sounds play and how loud; saved on this computer. */
+function SoundSettingsPage() {
+  const settings = useSoundSettings();
+  const toggle = (kind: SoundKind, on: boolean) =>
+    setSoundSettings({ ...settings, off: on ? settings.off.filter((k) => k !== kind) : [...settings.off, kind] });
+
+  return (
+    <div className="settings-page">
+      <section className="settings-group" aria-labelledby="settings-sound-volume">
+        <h3 id="settings-sound-volume">Sounds</h3>
+        <label className="sound-volume">
+          <span>Volume</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={settings.volume}
+            onChange={(e) => setSoundSettings({ ...settings, volume: Number(e.target.value) })}
+            onPointerUp={() => playSound("message", { force: true })}
+            onKeyUp={() => playSound("message", { force: true })}
+          />
+          <output>{settings.volume}%</output>
+        </label>
+        <p className="muted small">
+          A new message sounds only while Ovrilo is in the background or that conversation is not open. While you are
+          deafened, only the deafen sounds play.
+        </p>
+      </section>
+      {SOUND_GROUPS.map((group) => (
+        <fieldset key={group.title} className="settings-group">
+          <legend>{group.title}</legend>
+          <ul className="sound-list">
+            {group.kinds.map((kind) => (
+              <li key={kind} className="sound-row">
+                <label className="sound-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!settings.off.includes(kind)}
+                    onChange={(e) => toggle(kind, e.target.checked)}
+                  />
+                  <span>{SOUND_LABELS[kind]}</span>
+                </label>
+                <button
+                  className="icon-button small"
+                  aria-label={`Play: ${SOUND_LABELS[kind]}`}
+                  title="Play"
+                  onClick={() => playSound(kind, { force: true })}
+                >
+                  <Play size={14} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      ))}
+      <p className="muted small settings-footnote">Sounds play on Windows' default speaker or headphones.</p>
+    </div>
   );
 }
 
