@@ -223,7 +223,10 @@ mod tests {
     #[test]
     #[ignore = "depends on the programs running on this computer"]
     fn prints_the_games_running_now() {
-        let games: Vec<String> = running_paths().iter().filter_map(|p| classify(p, &[])).collect();
+        let games: Vec<String> = running_paths()
+            .iter()
+            .filter_map(|p| classify(p, &[]))
+            .collect();
         println!("{} processes, games: {games:?}", running_paths().len());
     }
 
