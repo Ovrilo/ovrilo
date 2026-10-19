@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { Schemas } from "../../api/client";
 import { ContextMenu } from "../../components/ContextMenu";
 import { Avatar, IconButton } from "../../components/ui";
+import { useMyShown } from "../activity/activity";
 import { type Availability, useMyStatus, useSetMyStatus } from "../friends/myStatus";
 import { PRESENCE_LABEL, presenceClass } from "../friends/presence";
 import { useVoice, voice, voiceAvailable } from "../voice/voice";
@@ -13,6 +14,7 @@ export function UserBar({ user, onSettings }: { user: Schemas["CurrentUserRespon
   const { snapshot } = useVoice();
   const micOff = snapshot.microphoneMuted || snapshot.deafened;
   const status = useMyStatus();
+  const playing = useMyShown()?.playing ?? null;
   const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
   const anchor = useRef<HTMLButtonElement>(null);
   return (
@@ -40,6 +42,10 @@ export function UserBar({ user, onSettings }: { user: Schemas["CurrentUserRespon
         {snapshot.pushToTalk && snapshot.pushToTalkKey ? (
           <span className={snapshot.transmitting ? "ptt-live" : "muted"}>
             {snapshot.transmitting ? "Talking" : `Push to talk: ${snapshot.pushToTalkKey.label}`}
+          </span>
+        ) : playing ? (
+          <span className="user-bar-activity" title={`Playing ${playing}`}>
+            Playing {playing}
           </span>
         ) : (
           <span className="muted">@{user.username}</span>

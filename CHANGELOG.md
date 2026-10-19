@@ -5,6 +5,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 ## [Unreleased]
 
 ### New
+- See what your friends are playing: member lists, group chats and the Friends page show "Playing …" under their names. Ovrilo recognises games from your Steam, Epic Games and Xbox libraries and popular games; add others or turn sharing off under Settings → Activity. Only the game's name is shared, and nothing while you are invisible.
 - Delete your account under Settings → Account. You confirm with your password; your messages stay, shown as from “Deleted user”. Communities you own must be deleted first.
 - Choose your status by clicking your picture at the bottom left: Online, Away, Do not disturb or Invisible. Do not disturb mutes message sounds, notifications and ringing; Invisible makes you look offline. After 10 minutes without keyboard or mouse input you show as Away until you are back. Friends and members see the status as a coloured dot.
 - Invite links: Invite now offers Copy link next to the code. Opening a link starts Ovrilo (or brings it forward) and shows the community with a Join button, and Join with an invitation accepts a link as well as a code.

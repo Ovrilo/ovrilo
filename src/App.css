@@ -3379,3 +3379,40 @@ label.sound-toggle {
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* ---------- Game activity ---------- */
+
+.member-text {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.member-activity,
+.user-bar-activity {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-bar-activity {
+  color: var(--success);
+}
+
+.activity-now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.add-game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

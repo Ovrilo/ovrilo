@@ -3,6 +3,7 @@
 //! Tauri commands carry coarse control messages only; audio data never crosses UI IPC (ADR-0002).
 
 mod credentials;
+mod games;
 mod idle;
 mod notify;
 mod ptt;
@@ -44,6 +45,8 @@ pub fn run() {
             app_version,
             notify::notify_show,
             idle::idle_seconds,
+            games::games_detect,
+            games::games_running_programs,
             credentials::credentials_load_refresh_token,
             credentials::credentials_store_refresh_token,
             credentials::credentials_clear_refresh_token,

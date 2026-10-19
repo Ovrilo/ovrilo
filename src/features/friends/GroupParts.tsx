@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
-import { useMyStatus } from "./myStatus";
+import { useMyShown } from "../activity/activity";
 import { PersonMenu, type PersonMenuTarget } from "./PersonActions";
 import { PRESENCE_LABEL, presenceClass } from "./presence";
 
@@ -34,7 +34,7 @@ export function GroupMembersPanel({
   onRemove?: (member: ConversationUser) => void;
 }) {
   const online = useFriendsPresence();
-  const myStatus = useMyStatus();
+  const me = useMyShown();
   const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
   const openMenu = (member: ConversationUser, x: number, y: number) => {
     if (member.id === selfId) return;
@@ -46,7 +46,7 @@ export function GroupMembersPanel({
         <h2>Members — {group.members.length}</h2>
         <ul>
           {group.members.map((member) => {
-            const status = member.id === selfId ? (myStatus === "invisible" ? null : myStatus) : (online.get(member.id) ?? null);
+            const shown = member.id === selfId ? me : (online.get(member.id) ?? null);
             return (
               <li
                 key={member.id}
@@ -70,10 +70,13 @@ export function GroupMembersPanel({
               >
                 <span className="presence-avatar">
                   <Avatar name={member.displayName} assetId={member.avatarAssetId} size="sm" />
-                  {status && <span className={presenceClass(status)} role="img" aria-label={PRESENCE_LABEL[status]} />}
+                  {shown && <span className={presenceClass(shown.status)} role="img" aria-label={PRESENCE_LABEL[shown.status]} />}
                 </span>
-                <span className="member-name" title={`@${member.username}`}>
-                  {member.displayName}
+                <span className="member-text">
+                  <span className="member-name" title={`@${member.username}`}>
+                    {member.displayName}
+                  </span>
+                  {shown?.playing && <span className="member-activity">Playing {shown.playing}</span>}
                 </span>
                 {member.id === group.ownerId && <Crown size={14} className="member-owner" aria-label="Group owner" />}
                 {onRemove && member.id !== selfId && (

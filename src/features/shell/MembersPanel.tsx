@@ -3,7 +3,7 @@ import { Crown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { PersonMenu, type PersonMenuTarget } from "../friends/PersonActions";
-import { useMyStatus } from "../friends/myStatus";
+import { useMyShown } from "../activity/activity";
 import { applyPresence, PRESENCE_LABEL, type PresenceMap, presenceMap, presenceClass } from "../friends/presence";
 
 import type { Schemas } from "../../api/client";
@@ -56,9 +56,9 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
     setMenu({ person: { id: member.userId, displayName: memberName(member), username: member.username }, x, y });
   };
   // You appear as you chose (others' view of you may lag a moment); invisible looks offline.
-  const myStatus = useMyStatus();
-  const statusOf = (m: Member) => (m.userId === selfId ? (myStatus === "invisible" ? null : myStatus) : (online.get(m.userId) ?? null));
-  const isOnline = (m: Member) => statusOf(m) !== null;
+  const me = useMyShown();
+  const shownOf = (m: Member) => (m.userId === selfId ? me : (online.get(m.userId) ?? null));
+  const isOnline = (m: Member) => shownOf(m) !== null;
 
   const all = members.data ?? [];
   const groups = [
@@ -98,16 +98,16 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
                     <span className="presence-avatar">
                       <Avatar name={memberName(member)} assetId={member.avatarAssetId} size="sm" />
                       <span
-                        className={presenceClass(statusOf(member))}
+                        className={presenceClass(shownOf(member)?.status)}
                         role="img"
-                        aria-label={(() => {
-                          const status = statusOf(member);
-                          return status ? PRESENCE_LABEL[status] : "Offline";
-                        })()}
+                        aria-label={PRESENCE_LABEL[shownOf(member)?.status ?? "offline"]}
                       />
                     </span>
-                    <span className="member-name" title={`@${member.username}`}>
-                      {memberName(member)}
+                    <span className="member-text">
+                      <span className="member-name" title={`@${member.username}`}>
+                        {memberName(member)}
+                      </span>
+                      {shownOf(member)?.playing && <span className="member-activity">Playing {shownOf(member)?.playing}</span>}
                     </span>
                     {member.role === "owner" && (
                       <Crown size={14} className="member-owner" aria-label="Community owner" />
