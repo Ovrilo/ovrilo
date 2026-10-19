@@ -4,16 +4,19 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-19
+
+See what your friends are playing, choose your status, and never miss a message: notifications, sounds and invite links.
+
 ### New
-- Click someone in a member list for their profile card: picture, status, the game they are playing and for how long, and buttons to message, add or block them. Right-click still opens the quick menu.
 - See what your friends are playing: member lists, group chats and the Friends page show "Playing …" under their names. Ovrilo recognises games from your Steam, Epic Games and Xbox libraries and popular games; add others or turn sharing off under Settings → Activity. Only the game's name is shared, and nothing while you are invisible.
+- Click someone in a member list for their profile card: picture, status, the game they are playing and for how long, and buttons to message, add or block them. Right-click opens a quick menu with the same actions, also in voice rooms.
+- Choose your status by clicking your picture at the bottom left: Online, Away, Do not disturb or Invisible. Do not disturb mutes message sounds, notifications and ringing; Invisible makes you look offline. After 10 minutes without keyboard or mouse input you show as Away until you are back.
+- Windows notifications for new direct and group messages and for incoming calls while Ovrilo is in the background. Click one to open the conversation.
+- Notification sounds when a message arrives, when someone joins or leaves your voice room, when you connect or disconnect, and when you mute or deafen. Turn each on or off, set their volume, or hide message text in notifications under Settings → Notifications.
+- Invite links: Invite offers Copy link next to the code. Opening a link starts Ovrilo (or brings it forward) and shows the community with a Join button, and Join with an invitation accepts a link as well as a code.
 - Delete your account under Settings → Account. You confirm with your password; your messages stay, shown as from “Deleted user”. Communities you own must be deleted first.
-- Choose your status by clicking your picture at the bottom left: Online, Away, Do not disturb or Invisible. Do not disturb mutes message sounds, notifications and ringing; Invisible makes you look offline. After 10 minutes without keyboard or mouse input you show as Away until you are back. Friends and members see the status as a coloured dot.
-- Invite links: Invite now offers Copy link next to the code. Opening a link starts Ovrilo (or brings it forward) and shows the community with a Join button, and Join with an invitation accepts a link as well as a code.
-- Windows notifications for new direct and group messages and for incoming calls while Ovrilo is in the background. Click one to open the conversation. Turn them off, or hide the message text, under Settings → Notifications.
 - Settings → About shows the app version and the open-source software Ovrilo is built with, each with its license.
-- Click or right-click someone in a member list or a voice room to message them, add them as a friend or block them.
-- Notification sounds: a chime for new direct and group messages while Ovrilo is in the background, when someone joins or leaves your voice room, when you connect or disconnect, and when you mute or deafen. Turn each one on or off and set their volume under Settings → Notifications.
 
 ### Fixed
 - In a small window, people in a voice channel no longer overlap or get cut off at the top; the room scrolls instead.
