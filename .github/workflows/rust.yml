@@ -5,10 +5,25 @@ name: Rust
 
 on:
   pull_request:
-    paths: ["src-tauri/**", ".github/workflows/rust.yml"]
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/rust.yml"
+      # Third-party notices cover the frontend's packages too.
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/licenses.mjs"
+      - "scripts/license-texts/**"
+      - "src/assets/third-party-licenses.json"
   push:
     branches: [main]
-    paths: ["src-tauri/**", ".github/workflows/rust.yml"]
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/rust.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/licenses.mjs"
+      - "scripts/license-texts/**"
+      - "src/assets/third-party-licenses.json"
   workflow_dispatch:
 
 permissions:
@@ -67,3 +82,6 @@ jobs:
         working-directory: src-tauri
       - run: cargo test $CARGO_DEV_DEPS_UNOPTIMIZED --locked
         working-directory: src-tauri
+      # After the build, so the crates' sources and the prebuilt libwebrtc are on disk.
+      - name: Third-party licenses are complete and up to date
+        run: node scripts/licenses.mjs --check

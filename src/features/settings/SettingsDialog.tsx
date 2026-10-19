@@ -8,10 +8,11 @@ import { PicturePicker } from "../../components/PicturePicker";
 import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
+import { AboutSettings } from "./AboutSettings";
 import { playSound, setSoundSettings, SOUND_LABELS, type SoundKind, useSoundSettings } from "../sounds/sounds";
 import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
-type Tab = "audio" | "notifications" | "account";
+type Tab = "audio" | "notifications" | "account" | "about";
 
 export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserResponse"]; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("audio");
@@ -28,9 +29,20 @@ export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserRe
           <button role="tab" aria-selected={tab === "account"} onClick={() => setTab("account")}>
             Account
           </button>
+          <button role="tab" aria-selected={tab === "about"} onClick={() => setTab("about")}>
+            About
+          </button>
         </nav>
         <div className="settings-body" role="tabpanel">
-          {tab === "audio" ? <AudioSettings /> : tab === "notifications" ? <SoundSettingsPage /> : <AccountSettings user={user} />}
+          {tab === "audio" ? (
+            <AudioSettings />
+          ) : tab === "notifications" ? (
+            <SoundSettingsPage />
+          ) : tab === "about" ? (
+            <AboutSettings />
+          ) : (
+            <AccountSettings user={user} />
+          )}
         </div>
       </div>
       <div className="dialog-actions">
