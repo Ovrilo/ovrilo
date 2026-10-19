@@ -28,6 +28,8 @@ pub struct RunningProgram {
 const KNOWN_GAMES: &[(&str, &str)] = &[
     ("valorant-win64-shipping.exe", "VALORANT"),
     ("league of legends.exe", "League of Legends"),
+    // The client (lobby, champion select) runs before and between matches.
+    ("leagueclient.exe", "League of Legends"),
     ("cs2.exe", "Counter-Strike 2"),
     ("fortniteclient-win64-shipping.exe", "Fortnite"),
     ("r5apex.exe", "Apex Legends"),
@@ -271,6 +273,10 @@ mod tests {
         assert_eq!(
             game(r"C:\Riot Games\VALORANT\live\ShooterGame\Binaries\Win64\VALORANT-Win64-Shipping.exe").as_deref(),
             Some("VALORANT")
+        );
+        assert_eq!(
+            game(r"C:\Riot Games\League of Legends\LeagueClient.exe").as_deref(),
+            Some("League of Legends")
         );
         let custom = [CustomGame {
             exe: "Notepad++.exe".into(),
