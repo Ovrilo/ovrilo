@@ -160,8 +160,15 @@ pub async fn games_running_programs(custom: Vec<CustomGame>) -> Vec<RunningProgr
 }
 
 /// Full paths of the running processes this user may query.
+///
+/// The process list comes from a snapshot that needs no access to the processes themselves. Each
+/// process is opened (query-only, briefly) once, the first time it is seen: a running game is not
+/// touched again on later checks, which keeps anti-cheat software from seeing repeated access.
 #[cfg(windows)]
 fn running_paths() -> Vec<String> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, PoisonError};
+
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
@@ -172,40 +179,67 @@ fn running_paths() -> Vec<String> {
         QueryFullProcessImageNameW,
     };
 
-    let mut paths = Vec::new();
-    // SAFETY: plain Win32 calls; every handle opened here is closed below, and the buffers passed
-    // are valid for the sizes given.
-    unsafe {
+    /// Path per process, keyed by ID and file name (IDs are reused after a process exits).
+    type Paths = HashMap<(u32, String), Option<String>>;
+    static KNOWN: Mutex<Option<Paths>> = Mutex::new(None);
+
+    // SAFETY: plain Win32 calls; the snapshot handle is closed below, and the entry buffer is
+    // valid for the size given.
+    let running: Vec<(u32, String)> = unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == INVALID_HANDLE_VALUE {
-            return paths;
+            return Vec::new();
         }
         let mut entry = PROCESSENTRY32W {
             dwSize: size_of::<PROCESSENTRY32W>() as u32,
             ..Default::default()
         };
+        let mut running = Vec::new();
         let mut more = Process32FirstW(snapshot, &mut entry) != 0;
         while more {
-            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
-            if !process.is_null() {
+            let length = entry
+                .szExeFile
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(entry.szExeFile.len());
+            running.push((
+                entry.th32ProcessID,
+                String::from_utf16_lossy(&entry.szExeFile[..length]),
+            ));
+            more = Process32NextW(snapshot, &mut entry) != 0;
+        }
+        CloseHandle(snapshot);
+        running
+    };
+
+    let mut guard = KNOWN.lock().unwrap_or_else(PoisonError::into_inner);
+    let known = guard.get_or_insert_with(HashMap::new);
+    let mut current = HashMap::with_capacity(running.len());
+    for key in running {
+        let path = known.remove(&key).unwrap_or_else(|| {
+            // SAFETY: the handle is checked and closed; the buffer is valid for `length` units.
+            unsafe {
+                let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, key.0);
+                if process.is_null() {
+                    return None;
+                }
                 let mut buffer = [0u16; 1024];
                 let mut length = buffer.len() as u32;
-                if QueryFullProcessImageNameW(
+                let ok = QueryFullProcessImageNameW(
                     process,
                     PROCESS_NAME_WIN32,
                     buffer.as_mut_ptr(),
                     &mut length,
-                ) != 0
-                {
-                    paths.push(String::from_utf16_lossy(&buffer[..length as usize]));
-                }
+                ) != 0;
                 CloseHandle(process);
+                ok.then(|| String::from_utf16_lossy(&buffer[..length as usize]))
             }
-            more = Process32NextW(snapshot, &mut entry) != 0;
-        }
-        CloseHandle(snapshot);
+        });
+        current.insert(key, path);
     }
-    paths
+    // Processes that exited drop out here.
+    *known = current;
+    known.values().flatten().cloned().collect()
 }
 
 #[cfg(not(windows))]
