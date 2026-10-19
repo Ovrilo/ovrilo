@@ -3242,3 +3242,64 @@ label.sound-toggle {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
+
+/* ---------- About: third-party licenses ---------- */
+
+.license-list {
+  overflow-y: auto;
+  max-height: 360px;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+
+.license-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.license-list summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--space-3);
+  padding: 8px var(--space-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.license-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.license-list summary:hover {
+  background: var(--surface-2);
+}
+
+.license-list details > p {
+  margin: 0 var(--space-3) var(--space-2);
+}
+
+.license-name {
+  font-size: 14px;
+}
+
+.license-text {
+  overflow: auto;
+  max-height: 240px;
+  margin: 0 var(--space-3) var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.selectable {
+  user-select: text;
+}
