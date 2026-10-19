@@ -5,6 +5,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 ## [Unreleased]
 
 ### Fixed
+- In a small window, people in a voice channel no longer overlap or get cut off at the top; the room scrolls instead.
 - Group chats show a clear group icon instead of two overlapping pictures that hid each other's initials.
 
 ## [0.8.0] - 2026-10-17
