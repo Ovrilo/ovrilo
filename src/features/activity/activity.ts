@@ -41,7 +41,7 @@ function load(): ActivitySettings {
 }
 
 /** Settings and the game detected on this computer right now, in one small store. */
-let state = { settings: load(), playing: null as string | null };
+let state = { settings: load(), playing: null as string | null, since: null as string | null };
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 const subscribe = (l: () => void) => {
@@ -63,13 +63,15 @@ export const useActivitySettings = () => useSyncExternalStore(subscribe, () => s
 
 /** The game this computer plays now, whether or not it is shared. */
 export const useDetectedGame = () => useSyncExternalStore(subscribe, () => state.playing);
+const useDetectedSince = () => useSyncExternalStore(subscribe, () => state.since);
 
 /** How you appear in lists yourself: what others see (nothing while invisible). */
 export function useMyShown(): Shown | null {
   const status = useMyStatus();
   const settings = useActivitySettings();
   const playing = useDetectedGame();
-  return status === "invisible" ? null : { status, playing: settings.share ? playing : null };
+  const since = useDetectedSince();
+  return status === "invisible" ? null : { status, playing: settings.share ? playing : null, since: settings.share ? since : null };
 }
 
 /** Game detection runs only in the desktop app. */
@@ -96,7 +98,7 @@ export function useGameActivity() {
         .then((playing) => {
           if (!current) return;
           if (playing !== state.playing) {
-            state = { ...state, playing };
+            state = { ...state, playing, since: playing ? new Date().toISOString() : null };
             emit();
           }
           realtime.setActivity(share ? playing : null);

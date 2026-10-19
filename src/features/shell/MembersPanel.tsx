@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Crown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PersonCard, type PersonCardTarget } from "../friends/PersonCard";
 import { PersonMenu, type PersonMenuTarget } from "../friends/PersonActions";
 import { useMyShown } from "../activity/activity";
 import { applyPresence, PRESENCE_LABEL, type PresenceMap, presenceMap, presenceClass } from "../friends/presence";
@@ -51,9 +52,16 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
   const members = useMembers(communityId);
   const online = usePresence(communityId);
   const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
+  const [card, setCard] = useState<PersonCardTarget | null>(null);
+  const personOf = (member: Member) => ({ id: member.userId, displayName: memberName(member), username: member.username });
   const openMenu = (member: Member, x: number, y: number) => {
     if (member.userId === selfId) return;
-    setMenu({ person: { id: member.userId, displayName: memberName(member), username: member.username }, x, y });
+    setMenu({ person: personOf(member), x, y });
+  };
+  // The card opens beside the row, to the left of the member list.
+  const openCard = (member: Member, row: HTMLElement) => {
+    const box = row.getBoundingClientRect();
+    setCard({ person: { ...personOf(member), avatarAssetId: member.avatarAssetId }, x: box.left - 300, y: box.top });
   };
   // You appear as you chose (others' view of you may lag a moment); invisible looks offline.
   const me = useMyShown();
@@ -80,19 +88,23 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
                 {group.items.map((member) => (
                   <li
                     key={member.userId}
-                    className={`member-row avatar-hover-scope${group.label === "Offline" ? " offline" : ""}${member.userId === selfId ? "" : " actionable"}`}
-                    tabIndex={member.userId === selfId ? undefined : 0}
-                    aria-haspopup={member.userId === selfId ? undefined : "menu"}
-                    onClick={(e) => openMenu(member, e.clientX, e.clientY)}
+                    className={`member-row avatar-hover-scope actionable${group.label === "Offline" ? " offline" : ""}`}
+                    tabIndex={0}
+                    aria-haspopup="dialog"
+                    onClick={(e) => openCard(member, e.currentTarget)}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       openMenu(member, e.clientX, e.clientY);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key !== "Enter" && e.key !== " " && e.key !== "ContextMenu") return;
-                      e.preventDefault();
-                      const box = e.currentTarget.getBoundingClientRect();
-                      openMenu(member, box.left + 24, box.bottom);
+                      if (e.key === "ContextMenu") {
+                        e.preventDefault();
+                        const box = e.currentTarget.getBoundingClientRect();
+                        openMenu(member, box.left + 24, box.bottom);
+                      } else if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openCard(member, e.currentTarget);
+                      }
                     }}
                   >
                     <span className="presence-avatar">
@@ -119,6 +131,14 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
           ),
       )}
       {menu && <PersonMenu target={menu} onClose={() => setMenu(null)} />}
+      {card && (
+        <PersonCard
+          target={card}
+          shown={card.person.id === selfId ? me : (online.get(card.person.id) ?? null)}
+          self={card.person.id === selfId}
+          onClose={() => setCard(null)}
+        />
+      )}
     </aside>
   );
 }

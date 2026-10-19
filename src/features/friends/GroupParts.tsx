@@ -5,6 +5,7 @@ import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
 import { useMyShown } from "../activity/activity";
+import { PersonCard, type PersonCardTarget } from "./PersonCard";
 import { PersonMenu, type PersonMenuTarget } from "./PersonActions";
 import { PRESENCE_LABEL, presenceClass } from "./presence";
 
@@ -36,9 +37,14 @@ export function GroupMembersPanel({
   const online = useFriendsPresence();
   const me = useMyShown();
   const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
+  const [card, setCard] = useState<PersonCardTarget | null>(null);
   const openMenu = (member: ConversationUser, x: number, y: number) => {
     if (member.id === selfId) return;
     setMenu({ person: { id: member.id, displayName: member.displayName, username: member.username }, x, y });
+  };
+  const openCard = (member: ConversationUser, row: HTMLElement) => {
+    const box = row.getBoundingClientRect();
+    setCard({ person: { ...member }, x: box.left - 300, y: box.top });
   };
   return (
     <aside className="members-panel" aria-label="Group members">
@@ -50,22 +56,27 @@ export function GroupMembersPanel({
             return (
               <li
                 key={member.id}
-                className={`member-row avatar-hover-scope${member.id === selfId ? "" : " actionable"}`}
-                tabIndex={member.id === selfId ? undefined : 0}
-                aria-haspopup={member.id === selfId ? undefined : "menu"}
+                className="member-row avatar-hover-scope actionable"
+                tabIndex={0}
+                aria-haspopup="dialog"
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest(".member-remove")) return;
-                  openMenu(member, e.clientX, e.clientY);
+                  openCard(member, e.currentTarget);
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   openMenu(member, e.clientX, e.clientY);
                 }}
                 onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " " && e.key !== "ContextMenu")) return;
-                  e.preventDefault();
-                  const box = e.currentTarget.getBoundingClientRect();
-                  openMenu(member, box.left + 24, box.bottom);
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "ContextMenu") {
+                    e.preventDefault();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    openMenu(member, box.left + 24, box.bottom);
+                  } else if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openCard(member, e.currentTarget);
+                  }
                 }}
               >
                 <span className="presence-avatar">
@@ -95,6 +106,14 @@ export function GroupMembersPanel({
         </ul>
       </section>
       {menu && <PersonMenu target={menu} onClose={() => setMenu(null)} />}
+      {card && (
+        <PersonCard
+          target={card}
+          shown={card.person.id === selfId ? me : (online.get(card.person.id) ?? null)}
+          self={card.person.id === selfId}
+          onClose={() => setCard(null)}
+        />
+      )}
     </aside>
   );
 }

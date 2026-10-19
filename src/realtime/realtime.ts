@@ -33,7 +33,7 @@ export interface RealtimeEvents {
 export type Presence = "online" | "away" | "doNotDisturb";
 
 /** What someone is doing: the game they play. */
-export type Activity = { type: "playing"; name: string };
+export type Activity = { type: "playing"; name: string; startedAt?: string | null };
 
 /** People online right now, how, and what they play (SubscribeCommunity, GetFriendsPresence). */
 export type PresenceEntry = { userId: string; status: Presence; activity?: Activity | null };
