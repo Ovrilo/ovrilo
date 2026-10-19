@@ -68,6 +68,12 @@ strip = true
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-single-instance = { version = "=2.5.2", features = ["deep-link"] }
 tauri-winrt-notification = "=0.8.1"
-# GetAsyncKeyState for the push-to-talk key, GetLastInputInfo/GetTickCount for idle time
-# (already in the dependency tree via Tauri).
-windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation"] }
+# GetAsyncKeyState for the push-to-talk key, GetLastInputInfo/GetTickCount for idle time, the
+# process snapshot for game detection (already in the dependency tree via Tauri).
+windows-sys = { version = "0.61.2", features = [
+  "Win32_Foundation",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }

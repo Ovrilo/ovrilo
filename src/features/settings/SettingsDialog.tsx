@@ -9,6 +9,7 @@ import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { AboutSettings } from "./AboutSettings";
+import { ActivitySettingsPage } from "./ActivitySettings";
 import { DeleteAccount } from "./DeleteAccount";
 import {
   desktopNotificationsAvailable,
@@ -18,7 +19,7 @@ import {
 import { playSound, setSoundSettings, SOUND_LABELS, type SoundKind, useSoundSettings } from "../sounds/sounds";
 import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
-type Tab = "audio" | "notifications" | "account" | "about";
+type Tab = "audio" | "notifications" | "activity" | "account" | "about";
 
 export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserResponse"]; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("audio");
@@ -32,6 +33,9 @@ export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserRe
           <button role="tab" aria-selected={tab === "notifications"} onClick={() => setTab("notifications")}>
             Notifications
           </button>
+          <button role="tab" aria-selected={tab === "activity"} onClick={() => setTab("activity")}>
+            Activity
+          </button>
           <button role="tab" aria-selected={tab === "account"} onClick={() => setTab("account")}>
             Account
           </button>
@@ -44,6 +48,8 @@ export function SettingsDialog({ user, onClose }: { user: Schemas["CurrentUserRe
             <AudioSettings />
           ) : tab === "notifications" ? (
             <SoundSettingsPage />
+          ) : tab === "activity" ? (
+            <ActivitySettingsPage />
           ) : tab === "about" ? (
             <AboutSettings />
           ) : (

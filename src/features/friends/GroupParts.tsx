@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
-import { useMyStatus } from "./myStatus";
+import { useMyShown } from "../activity/activity";
+import { PersonCard, type PersonCardTarget } from "./PersonCard";
 import { PersonMenu, type PersonMenuTarget } from "./PersonActions";
 import { PRESENCE_LABEL, presenceClass } from "./presence";
 
@@ -34,11 +35,16 @@ export function GroupMembersPanel({
   onRemove?: (member: ConversationUser) => void;
 }) {
   const online = useFriendsPresence();
-  const myStatus = useMyStatus();
+  const me = useMyShown();
   const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
+  const [card, setCard] = useState<PersonCardTarget | null>(null);
   const openMenu = (member: ConversationUser, x: number, y: number) => {
     if (member.id === selfId) return;
     setMenu({ person: { id: member.id, displayName: member.displayName, username: member.username }, x, y });
+  };
+  const openCard = (member: ConversationUser, row: HTMLElement) => {
+    const box = row.getBoundingClientRect();
+    setCard({ person: { ...member }, x: box.left - 300, y: box.top });
   };
   return (
     <aside className="members-panel" aria-label="Group members">
@@ -46,34 +52,42 @@ export function GroupMembersPanel({
         <h2>Members — {group.members.length}</h2>
         <ul>
           {group.members.map((member) => {
-            const status = member.id === selfId ? (myStatus === "invisible" ? null : myStatus) : (online.get(member.id) ?? null);
+            const shown = member.id === selfId ? me : (online.get(member.id) ?? null);
             return (
               <li
                 key={member.id}
-                className={`member-row avatar-hover-scope${member.id === selfId ? "" : " actionable"}`}
-                tabIndex={member.id === selfId ? undefined : 0}
-                aria-haspopup={member.id === selfId ? undefined : "menu"}
+                className="member-row avatar-hover-scope actionable"
+                tabIndex={0}
+                aria-haspopup="dialog"
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest(".member-remove")) return;
-                  openMenu(member, e.clientX, e.clientY);
+                  openCard(member, e.currentTarget);
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   openMenu(member, e.clientX, e.clientY);
                 }}
                 onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " " && e.key !== "ContextMenu")) return;
-                  e.preventDefault();
-                  const box = e.currentTarget.getBoundingClientRect();
-                  openMenu(member, box.left + 24, box.bottom);
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "ContextMenu") {
+                    e.preventDefault();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    openMenu(member, box.left + 24, box.bottom);
+                  } else if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openCard(member, e.currentTarget);
+                  }
                 }}
               >
                 <span className="presence-avatar">
                   <Avatar name={member.displayName} assetId={member.avatarAssetId} size="sm" />
-                  {status && <span className={presenceClass(status)} role="img" aria-label={PRESENCE_LABEL[status]} />}
+                  {shown && <span className={presenceClass(shown.status)} role="img" aria-label={PRESENCE_LABEL[shown.status]} />}
                 </span>
-                <span className="member-name" title={`@${member.username}`}>
-                  {member.displayName}
+                <span className="member-text">
+                  <span className="member-name" title={`@${member.username}`}>
+                    {member.displayName}
+                  </span>
+                  {shown?.playing && <span className="member-activity">Playing {shown.playing}</span>}
                 </span>
                 {member.id === group.ownerId && <Crown size={14} className="member-owner" aria-label="Group owner" />}
                 {onRemove && member.id !== selfId && (
@@ -92,6 +106,14 @@ export function GroupMembersPanel({
         </ul>
       </section>
       {menu && <PersonMenu target={menu} onClose={() => setMenu(null)} />}
+      {card && (
+        <PersonCard
+          target={card}
+          shown={card.person.id === selfId ? me : (online.get(card.person.id) ?? null)}
+          self={card.person.id === selfId}
+          onClose={() => setCard(null)}
+        />
+      )}
     </aside>
   );
 }

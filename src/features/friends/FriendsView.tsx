@@ -14,7 +14,7 @@ import {
   useFriends,
   useFriendsPresence,
 } from "./friends";
-import { PRESENCE_LABEL, type PresenceMap, presenceClass } from "./presence";
+import { PRESENCE_LABEL, type PresenceMap, presenceClass, presenceLine } from "./presence";
 
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
@@ -187,8 +187,8 @@ function FriendList({
           <PersonRow
             key={f.user.id}
             user={f.user}
-            presence={online.get(f.user.id) ?? null}
-            status={PRESENCE_LABEL[online.get(f.user.id) ?? "offline"]}
+            presence={online.get(f.user.id)?.status ?? null}
+            status={presenceLine(online.get(f.user.id) ?? null)}
           >
             <IconButton icon={MessageCircle} label={`Message ${f.user.displayName}`} onClick={() => onMessage(f.user.id)} />
             <IconButton

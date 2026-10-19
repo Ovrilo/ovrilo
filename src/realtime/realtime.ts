@@ -9,7 +9,7 @@ export interface RealtimeEvents {
   MessageDeleted: Schemas["MessageResponse"];
   ReadStateUpdated: Schemas["ReadStateResponse"];
   /** `status` is null when offline; older servers omit it (then online means "online"). */
-  PresenceChanged: { userId: string; online: boolean; status?: Presence | null };
+  PresenceChanged: { userId: string; online: boolean; status?: Presence | null; activity?: Activity | null };
   /** contracts/events/README.md: the other person and what changed; refetch the lists. */
   FriendsChanged: { change: "requestReceived" | "friendAdded" | "updated"; user: Schemas["SocialUserResponse"] };
   /** Calls in direct and group conversations (contracts/events/README.md). */
@@ -32,8 +32,11 @@ export interface RealtimeEvents {
 /** What a connected person shows to others. */
 export type Presence = "online" | "away" | "doNotDisturb";
 
-/** People online right now and how (SubscribeCommunity, GetFriendsPresence). */
-export type PresenceEntry = { userId: string; status: Presence };
+/** What someone is doing: the game they play. */
+export type Activity = { type: "playing"; name: string; startedAt?: string | null };
+
+/** People online right now, how, and what they play (SubscribeCommunity, GetFriendsPresence). */
+export type PresenceEntry = { userId: string; status: Presence; activity?: Activity | null };
 type PresenceSnapshot = (present: PresenceEntry[]) => void;
 type PresenceResponse = { onlineUserIds: string[]; statuses?: PresenceEntry[] | null };
 
@@ -55,6 +58,8 @@ export class RealtimeClient {
   private readonly communities = new Map<string, Set<PresenceSnapshot>>();
   /** Whether this computer is idle, as last reported by the app. */
   private idle = false;
+  /** The game this device plays, as last reported by the app. */
+  private playing: string | null = null;
   private readonly handlers = new Map<string, Set<(payload: unknown) => void>>();
   private readonly resyncListeners = new Set<() => void>();
   private readonly statusListeners = new Set<() => void>();
@@ -147,6 +152,15 @@ export class RealtimeClient {
     }
   }
 
+  /** Tells the server which game this device plays (null: none); repeated after every reconnect. */
+  setActivity(playing: string | null): void {
+    if (this.playing === playing) return;
+    this.playing = playing;
+    if (this.connection?.state === HubConnectionState.Connected) {
+      void this.connection.invoke("SetActivity", playing).catch(() => undefined);
+    }
+  }
+
   /** Tells the server whether this computer is idle; repeated after every reconnect. */
   setIdle(idle: boolean): void {
     if (this.idle === idle) return;
@@ -221,6 +235,7 @@ export class RealtimeClient {
       ...[...this.channels.keys()].map((id) => connection.invoke("SubscribeChannel", id).catch(() => undefined)),
       ...[...this.communities].map(([id, listeners]) => this.watchCommunity(connection, id, listeners)),
       ...(this.idle ? [connection.invoke("SetIdle", true).catch(() => undefined)] : []),
+      ...(this.playing ? [connection.invoke("SetActivity", this.playing).catch(() => undefined)] : []),
     ]);
     this.setStatus("connected");
     this.resyncListeners.forEach((listener) => listener());
