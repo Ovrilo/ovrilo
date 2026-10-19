@@ -20,7 +20,16 @@ fn app_version() -> &'static str {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // First: a second launch (for example an ovrilo:// link opened by Windows) hands its
+    // arguments to this instance, which shows itself and lets the deep-link plugin report them.
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        tray::show_main_window(app);
+    }));
+    builder
+        // ovrilo:// links (registered by the installer, tauri.conf.json); invitations open in-app.
+        .plugin(tauri_plugin_deep_link::init())
         // Signed updates from Ovrilo/ovrilo-releases (tauri.conf.json); restart after install.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())

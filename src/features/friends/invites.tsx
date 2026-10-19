@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useContext } from "react";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { isTauri } from "@tauri-apps/api/core";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 import { problemMessage } from "../../api/client";
 import { useApi } from "../../auth/SessionContext";
@@ -13,9 +15,48 @@ const INVITE_LINK = /ovrilo:\/\/invite\/([A-Za-z0-9]{12})\b/;
 /** An invitation sent to a friend works once and lasts a week. */
 const FRIEND_INVITE_HOURS = 24 * 7;
 
+/** The website page that opens an invitation in Ovrilo, or offers the download (code after #). */
+export const INVITE_PAGE = "https://ovrilo.github.io/ovrilo-releases/invite.html";
+
 /** The invitation code in a message, if it carries one. */
 export function inviteCode(content: string | null | undefined): string | null {
   return content?.match(INVITE_LINK)?.[1] ?? null;
+}
+
+/** A code typed or pasted as itself, an ovrilo:// link or a website invite link. */
+export function parseInvite(input: string): string | null {
+  const text = input.trim();
+  if (/^[A-Za-z0-9]{12}$/.test(text)) return text;
+  const link = inviteCode(text);
+  if (link) return link;
+  const page = text.match(/invite\.html[^#\s]*#([A-Za-z0-9]{12})(?![A-Za-z0-9])/);
+  return page?.[1] ?? null;
+}
+
+export const inviteLink = (code: string) => `${INVITE_PAGE}#${code}`;
+
+/**
+ * Invitations opened from outside the app: an ovrilo:// link that started Ovrilo, or one opened
+ * while it runs (forwarded by the single-instance plugin).
+ */
+export function useInviteLinks(onInvite: (code: string) => void) {
+  const handler = useRef(onInvite);
+  handler.current = onInvite;
+  useEffect(() => {
+    if (!isTauri()) return;
+    const handle = (urls: string[] | null) => {
+      for (const url of urls ?? []) {
+        const code = parseInvite(url);
+        if (code) {
+          handler.current(code);
+          return;
+        }
+      }
+    };
+    void getCurrent().then(handle).catch(() => {});
+    const off = onOpenUrl(handle);
+    return () => void off.then((unlisten) => unlisten());
+  }, []);
 }
 
 /** The message text around the invitation link (the link itself shows as a card). */
@@ -73,7 +114,7 @@ function useInvitationPreview(code: string) {
 }
 
 /** An invitation in a message: the community it leads to and a Join button. */
-export function InviteCard({ code, own }: { code: string; own: boolean }) {
+export function InviteCard({ code, own, onJoined }: { code: string; own: boolean; onJoined?: () => void }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const openCommunity = useContext(OpenCommunityContext);
@@ -88,6 +129,7 @@ export function InviteCard({ code, own }: { code: string; own: boolean }) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.communities });
       void queryClient.invalidateQueries({ queryKey: ["invitations", code] });
       openCommunity(community.id);
+      onJoined?.();
     },
   });
 
@@ -117,7 +159,14 @@ export function InviteCard({ code, own }: { code: string; own: boolean }) {
           </span>
         </div>
         {alreadyMember ? (
-          <button onClick={() => openCommunity(communityId)}>Open</button>
+          <button
+            onClick={() => {
+              openCommunity(communityId);
+              onJoined?.();
+            }}
+          >
+            Open
+          </button>
         ) : (
           !own && (
             <button className="primary" disabled={join.isPending} onClick={() => join.mutate()}>

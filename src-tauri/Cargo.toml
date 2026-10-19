@@ -25,6 +25,7 @@ ovrilo-voice-cpal = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "56d
 ovrilo-voice-livekit = { git = "https://github.com/Ovrilo/ovrilo-voice", rev = "56d0c5677ef696a59c5a761706113c5ca648acc5" }
 tauri-plugin-updater = "=2.13.1"
 tauri-plugin-process = "=2.4.0"
+tauri-plugin-deep-link = "=2.6.1"
 
 # Real-time audio (ovrilo-voice, LiveKit, cpal) stutters when unoptimized; optimize all
 # dependencies in dev builds while the app crate itself stays fast to rebuild.
@@ -65,6 +66,7 @@ panic = "abort"
 strip = true
 
 [target.'cfg(windows)'.dependencies]
+tauri-plugin-single-instance = { version = "=2.5.2", features = ["deep-link"] }
 tauri-winrt-notification = "=0.8.1"
 # GetAsyncKeyState for the push-to-talk key (already in the dependency tree via Tauri).
 windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse"] }
