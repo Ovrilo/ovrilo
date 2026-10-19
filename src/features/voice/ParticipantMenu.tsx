@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ContextMenu } from "../../components/ContextMenu";
+import { PersonActions } from "../friends/PersonActions";
 import { useVoice, voice } from "./voice";
 
 export interface ParticipantMenuTarget {
@@ -11,7 +12,8 @@ export interface ParticipantMenuTarget {
 
 /**
  * Right-click menu for a remote participant: local volume and "mute for me" (both only affect
- * what this client hears). Reads the participant live from the voice snapshot.
+ * what this client hears), then message / add friend / block. Reads the participant live from
+ * the voice snapshot.
  */
 export function ParticipantMenu({ target, onClose }: { target: ParticipantMenuTarget; onClose: () => void }) {
   const { snapshot } = useVoice();
@@ -73,6 +75,8 @@ export function ParticipantMenu({ target, onClose }: { target: ParticipantMenuTa
         Mute for me
       </label>
       <p className="context-menu-hint">Only changes what you hear.</p>
+      <div className="context-menu-separator" />
+      <PersonActions person={{ id: participant.id, displayName: participant.name }} onDone={onClose} />
     </ContextMenu>
   );
 }

@@ -3232,3 +3232,13 @@ label.sound-toggle {
   height: 16px;
   accent-color: var(--primary);
 }
+
+/* Member rows open the person menu on click, right-click or Enter. */
+.member-row.actionable {
+  cursor: pointer;
+}
+
+.member-row.actionable:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
