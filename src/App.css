@@ -3363,3 +3363,19 @@ label.sound-toggle {
   box-shadow: inset 0 0 0 2px var(--text-secondary);
   background: transparent;
 }
+
+/* ---------- Delete account ---------- */
+
+.delete-account {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.delete-account-list {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}

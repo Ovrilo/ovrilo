@@ -5,6 +5,7 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 ## [Unreleased]
 
 ### New
+- Delete your account under Settings → Account. You confirm with your password; your messages stay, shown as from “Deleted user”. Communities you own must be deleted first.
 - Choose your status by clicking your picture at the bottom left: Online, Away, Do not disturb or Invisible. Do not disturb mutes message sounds, notifications and ringing; Invisible makes you look offline. After 10 minutes without keyboard or mouse input you show as Away until you are back. Friends and members see the status as a coloured dot.
 - Invite links: Invite now offers Copy link next to the code. Opening a link starts Ovrilo (or brings it forward) and shows the community with a Join button, and Join with an invitation accepts a link as well as a code.
 - Windows notifications for new direct and group messages and for incoming calls while Ovrilo is in the background. Click one to open the conversation. Turn them off, or hide the message text, under Settings → Notifications.
