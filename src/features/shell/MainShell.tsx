@@ -31,6 +31,7 @@ import { FriendsView } from "../friends/FriendsView";
 import { TextChannel } from "../messages/TextChannel";
 import { type ChannelUnread, isUnread, unreadLabel, useCommunitiesWithUnread, useUnread, useUnreadSync } from "../messages/unread";
 import { SettingsDialog } from "../settings/SettingsDialog";
+import { useSoundCues } from "../sounds/useSoundCues";
 import { UpdateBanner } from "../update/UpdateBanner";
 import { useJoinVoice } from "../voice/useJoinVoice";
 import { ParticipantMenu, type ParticipantMenuTarget } from "../voice/ParticipantMenu";
@@ -92,6 +93,7 @@ export function MainShell({ user }: { user: Schemas["CurrentUserResponse"] }) {
   useFriendsSync();
   useDirectMessagesSync();
   useMuteBlockedInVoice();
+  useSoundCues(user.id, home ? dmId : null);
   const incomingRequests = useFriendRequests().data?.incoming.length ?? 0;
   const conversations = useConversations(user.id);
   const openDirectMessage = useOpenDirectMessage();

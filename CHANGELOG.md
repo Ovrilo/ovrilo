@@ -4,6 +4,9 @@ User-facing changes to the Ovrilo desktop app. Each release's notes are taken fr
 
 ## [Unreleased]
 
+### New
+- Notification sounds: a chime for new direct and group messages while Ovrilo is in the background, when someone joins or leaves your voice room, when you connect or disconnect, and when you mute or deafen. Turn each one on or off and set their volume under Settings → Notifications.
+
 ### Fixed
 - In a small window, people in a voice channel no longer overlap or get cut off at the top; the room scrolls instead.
 - Group chats show a clear group icon instead of two overlapping pictures that hid each other's initials.
