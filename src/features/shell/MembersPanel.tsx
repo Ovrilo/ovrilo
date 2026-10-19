@@ -2,6 +2,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Crown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PersonMenu, type PersonMenuTarget } from "../friends/PersonActions";
+
 import type { Schemas } from "../../api/client";
 import { useRealtime } from "../../auth/SessionContext";
 import { Avatar } from "../../components/ui";
@@ -51,6 +53,11 @@ function usePresence(communityId: string): ReadonlySet<string> {
 export function MembersPanel({ communityId, selfId }: { communityId: string; selfId: string }) {
   const members = useMembers(communityId);
   const online = usePresence(communityId);
+  const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
+  const openMenu = (member: Member, x: number, y: number) => {
+    if (member.userId === selfId) return;
+    setMenu({ person: { id: member.userId, displayName: memberName(member), username: member.username }, x, y });
+  };
   // We are online whenever we can see this list, even before the first snapshot arrives.
   const isOnline = (m: Member) => m.userId === selfId || online.has(m.userId);
 
@@ -74,7 +81,20 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
                 {group.items.map((member) => (
                   <li
                     key={member.userId}
-                    className={`member-row avatar-hover-scope${group.label === "Offline" ? " offline" : ""}`}
+                    className={`member-row avatar-hover-scope${group.label === "Offline" ? " offline" : ""}${member.userId === selfId ? "" : " actionable"}`}
+                    tabIndex={member.userId === selfId ? undefined : 0}
+                    aria-haspopup={member.userId === selfId ? undefined : "menu"}
+                    onClick={(e) => openMenu(member, e.clientX, e.clientY)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      openMenu(member, e.clientX, e.clientY);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " " && e.key !== "ContextMenu") return;
+                      e.preventDefault();
+                      const box = e.currentTarget.getBoundingClientRect();
+                      openMenu(member, box.left + 24, box.bottom);
+                    }}
                   >
                     <span className="presence-avatar">
                       <Avatar name={memberName(member)} assetId={member.avatarAssetId} size="sm" />
@@ -96,6 +116,7 @@ export function MembersPanel({ communityId, selfId }: { communityId: string; sel
             </section>
           ),
       )}
+      {menu && <PersonMenu target={menu} onClose={() => setMenu(null)} />}
     </aside>
   );
 }

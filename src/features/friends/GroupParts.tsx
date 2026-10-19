@@ -1,8 +1,10 @@
 import { Crown, UserMinus, Users } from "lucide-react";
+import { useState } from "react";
 
 import { Avatar } from "../../components/ui";
 import type { ConversationUser, GroupConversation } from "./dms";
 import { useFriendsPresence } from "./friends";
+import { PersonMenu, type PersonMenuTarget } from "./PersonActions";
 
 const GROUP_ICON_SIZE = { xs: 12, sm: 16, lg: 30 } as const;
 
@@ -30,6 +32,11 @@ export function GroupMembersPanel({
   onRemove?: (member: ConversationUser) => void;
 }) {
   const online = useFriendsPresence();
+  const [menu, setMenu] = useState<PersonMenuTarget | null>(null);
+  const openMenu = (member: ConversationUser, x: number, y: number) => {
+    if (member.id === selfId) return;
+    setMenu({ person: { id: member.id, displayName: member.displayName, username: member.username }, x, y });
+  };
   return (
     <aside className="members-panel" aria-label="Group members">
       <section className="members-group">
@@ -38,7 +45,26 @@ export function GroupMembersPanel({
           {group.members.map((member) => {
             const isOnline = member.id === selfId || online.has(member.id);
             return (
-              <li key={member.id} className="member-row avatar-hover-scope">
+              <li
+                key={member.id}
+                className={`member-row avatar-hover-scope${member.id === selfId ? "" : " actionable"}`}
+                tabIndex={member.id === selfId ? undefined : 0}
+                aria-haspopup={member.id === selfId ? undefined : "menu"}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest(".member-remove")) return;
+                  openMenu(member, e.clientX, e.clientY);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(member, e.clientX, e.clientY);
+                }}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " " && e.key !== "ContextMenu")) return;
+                  e.preventDefault();
+                  const box = e.currentTarget.getBoundingClientRect();
+                  openMenu(member, box.left + 24, box.bottom);
+                }}
+              >
                 <span className="presence-avatar">
                   <Avatar name={member.displayName} assetId={member.avatarAssetId} size="sm" />
                   {isOnline && <span className="presence-dot online" role="img" aria-label="Online" />}
@@ -62,6 +88,7 @@ export function GroupMembersPanel({
           })}
         </ul>
       </section>
+      {menu && <PersonMenu target={menu} onClose={() => setMenu(null)} />}
     </aside>
   );
 }
