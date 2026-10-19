@@ -9,6 +9,7 @@ import { Avatar, Select } from "../../components/ui";
 import { uploadImage } from "../../media/upload";
 import { keyFromCode, keyFromMouseButton, type PushToTalkKey } from "../voice/keys";
 import { AboutSettings } from "./AboutSettings";
+import { DeleteAccount } from "./DeleteAccount";
 import {
   desktopNotificationsAvailable,
   setNotificationSettings,
@@ -449,6 +450,7 @@ function AccountSettings({ user }: { user: Schemas["CurrentUserResponse"] }) {
       >
         <LogOut size={16} aria-hidden="true" /> Sign out
       </button>
+      <DeleteAccount />
     </div>
   );
 }
