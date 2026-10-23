@@ -176,3 +176,62 @@ describe("SessionManager.updateUser", () => {
     expect(session.getState()).toMatchObject({ status: "signedIn", user: { avatarAssetId: "asset-1" } });
   });
 });
+
+describe("SessionManager with the refresh cookie", () => {
+  const cookieStore: CredentialStore = {
+    cookie: true,
+    load: async () => null,
+    store: async () => undefined,
+    clear: async () => undefined,
+  };
+  const cookieAuth = (n: number) => ({ ...authResponse(n), refreshToken: null });
+
+  it("restores by refreshing with the cookie transport", async () => {
+    const send = vi.fn(async (_request: Request) => json(cookieAuth(1)));
+    const session = new SessionManager(BASE, cookieStore, send);
+
+    await session.restore();
+
+    expect(session.getState()).toMatchObject({ status: "signedIn" });
+    const request = send.mock.calls[0]![0];
+    expect(request.url).toBe(`${BASE}/auth/refresh`);
+    expect(request.headers.get("X-Ovrilo-Session")).toBe("cookie");
+    expect(request.credentials).toBe("include");
+  });
+
+  it("is signed out when the server has no valid cookie", async () => {
+    const send = vi.fn(async () => json({ code: "identity.invalid_refresh_token" }, 401));
+    const session = new SessionManager(BASE, cookieStore, send);
+
+    await session.restore();
+
+    expect(session.getState()).toEqual({ status: "signedOut" });
+  });
+
+  it("opts sign-in requests into the cookie transport", async () => {
+    const send = vi.fn(async (_request: Request) => json(cookieAuth(1)));
+    const session = new SessionManager(BASE, cookieStore, send);
+
+    await session.fetch(new Request(`${BASE}/auth/login`, { method: "POST", body: "{}" }));
+
+    const request = send.mock.calls[0]![0];
+    expect(request.headers.get("X-Ovrilo-Session")).toBe("cookie");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.has("Authorization")).toBe(false);
+  });
+
+  it("signs out on the server so it can clear the cookie", async () => {
+    const send = vi.fn(async (request: Request) =>
+      request.url.endsWith("/auth/logout") ? new Response(null, { status: 204 }) : json(cookieAuth(1)),
+    );
+    const session = new SessionManager(BASE, cookieStore, send);
+    await session.signIn(cookieAuth(1));
+
+    await session.signOut();
+
+    const logout = send.mock.calls.map((c) => c[0]).find((r) => r.url.endsWith("/auth/logout"))!;
+    expect(logout.headers.get("X-Ovrilo-Session")).toBe("cookie");
+    expect(logout.headers.get("Authorization")).toMatch(/^Bearer /);
+    expect(session.getState()).toEqual({ status: "signedOut" });
+  });
+});

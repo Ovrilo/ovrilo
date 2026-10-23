@@ -4,6 +4,7 @@ import { useMemo, useSyncExternalStore } from "react";
 
 import type { PushToTalkKey } from "./keys";
 import { summarize, type QualitySummary, type VoiceStats } from "./quality";
+import { webVoice, webVoiceSupported } from "./webVoice";
 
 /** IPC payloads mirrored from src-tauri/src/voice.rs (docs/development/CONTRACTS.md §4). */
 export type VoiceConnection = "disconnected" | "connecting" | "connected" | "reconnecting";
@@ -93,8 +94,9 @@ export interface VoiceError {
   message: string;
 }
 
-/** Voice needs the native host; plain-browser development (`pnpm dev`) has none. */
-export const voiceAvailable = isTauri();
+/** The desktop app runs the native engine; the browser client uses livekit-client (webVoice.ts, ADR-0019). */
+export const nativeVoice = isTauri();
+export const voiceAvailable = nativeVoice || webVoiceSupported;
 
 /** Stats samples kept for the quality window (~1 per second). */
 const STATS_WINDOW = 11;
@@ -155,10 +157,18 @@ function onSnapshot(snapshot: VoiceSnapshot) {
   setState({ snapshot, stats: leftRoom ? [] : state.stats });
 }
 
-/** The engine (in Rust) owns voice state; this store only mirrors its events. */
+/** The engine (in Rust, or webVoice in a browser) owns voice state; this store only mirrors its events. */
 function start() {
   if (started || !voiceAvailable) return;
   started = true;
+  if (!nativeVoice) {
+    webVoice.start({
+      onSnapshot,
+      onError: (lastError) => setState({ lastError }),
+      onStats: (stats) => setState({ stats: [...state.stats, stats].slice(-STATS_WINDOW) }),
+    });
+    return;
+  }
   void listen<VoiceSnapshot>("voice://state-changed", (event) => onSnapshot(event.payload));
   void listen<VoiceError>("voice://error", (event) => setState({ lastError: event.payload }));
   void listen<ScreenSource[]>("voice://screen-sources", (event) => setState({ screenSources: event.payload }));
@@ -196,12 +206,13 @@ function reportFailure(error: unknown) {
 
 function command(name: string, args?: Record<string, unknown>): Promise<void> {
   if (!voiceAvailable) return Promise.resolve();
-  return invoke<void>(name, args).catch(reportFailure);
+  return (nativeVoice ? invoke<void>(name, args) : webVoice.invoke(name, args)).catch(reportFailure);
 }
 
 export const voice = {
   join: (channelId: string, serverUrl: string, token: string, canShareScreen = false) => {
-    setState({ lastError: null, canShareScreen });
+    // Sharing from the browser is not supported yet; watching is (ADR-0019).
+    setState({ lastError: null, canShareScreen: canShareScreen && nativeVoice });
     return command("voice_join", { channelId, serverUrl, token });
   },
   listScreenSources: () => {

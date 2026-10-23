@@ -9,18 +9,15 @@ const osCredentialStore: CredentialStore = {
   clear: () => invoke("credentials_clear_refresh_token"),
 };
 
-/** Plain-browser development only (`pnpm dev`): memory, never web storage; sessions end on reload. */
-function memoryCredentialStore(): CredentialStore {
-  let token: string | null = null;
-  return {
-    load: async () => token,
-    store: async (value) => {
-      token = value;
-    },
-    clear: async () => {
-      token = null;
-    },
-  };
-}
+/**
+ * Browser client (ADR-0019): the API keeps the refresh token in an HttpOnly cookie that scripts cannot read, so
+ * nothing is stored here and nothing goes to web storage.
+ */
+const cookieCredentialStore: CredentialStore = {
+  cookie: true,
+  load: async () => null,
+  store: async () => undefined,
+  clear: async () => undefined,
+};
 
-export const credentialStore: CredentialStore = isTauri() ? osCredentialStore : memoryCredentialStore();
+export const credentialStore: CredentialStore = isTauri() ? osCredentialStore : cookieCredentialStore;

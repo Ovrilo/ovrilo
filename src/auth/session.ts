@@ -1,7 +1,12 @@
 import type { Schemas } from "../api/client";
 
-/** Where the refresh token lives. The desktop implementation is the OS credential store (see credentials.ts). */
+/**
+ * Where the refresh token lives. The desktop implementation is the OS credential store (see credentials.ts).
+ * With `cookie`, the API keeps it in an HttpOnly cookie instead (browser client, ADR-0019): the store holds nothing
+ * and auth requests opt into the cookie transport.
+ */
 export interface CredentialStore {
+  readonly cookie?: boolean;
   load(): Promise<string | null>;
   store(refreshToken: string): Promise<void>;
   clear(): Promise<void>;
@@ -37,9 +42,9 @@ export class SessionManager {
     return () => this.listeners.delete(listener);
   };
 
-  /** Restores a previous session from the credential store, if any. */
+  /** Restores a previous session from the credential store (or the refresh cookie), if any. */
   async restore(): Promise<void> {
-    const refreshToken = await this.credentials.load().catch(() => null);
+    const refreshToken = this.credentials.cookie ? "cookie" : await this.credentials.load().catch(() => null);
     if (!refreshToken) {
       this.setState({ status: "signedOut" });
       return;
@@ -51,7 +56,7 @@ export class SessionManager {
 
   /** Completes sign-in/registration with the API's token response. */
   async signIn(auth: Schemas["AuthResponse"]): Promise<void> {
-    await this.credentials.store(auth.refreshToken);
+    if (auth.refreshToken) await this.credentials.store(auth.refreshToken);
     this.accessToken = auth.accessToken;
     this.setState({ status: "signedIn", user: auth.user });
   }
@@ -64,10 +69,11 @@ export class SessionManager {
 
   /** Revokes the session on the server (best effort) and forgets local credentials. */
   async signOut(): Promise<void> {
-    if (this.accessToken) {
-      await this.send(this.authorized(new Request(`${this.baseUrl}/auth/logout`, { method: "POST" }), this.accessToken)).catch(
-        () => undefined,
-      );
+    // The refresh cookie is only cleared by the server, so make sure the logout call is authorized.
+    const token = this.credentials.cookie ? await this.getAccessToken() : this.accessToken;
+    if (token) {
+      const logout = this.withCookie(new Request(`${this.baseUrl}/auth/logout`, { method: "POST" }));
+      await this.send(this.authorized(logout, token)).catch(() => undefined);
     }
     await this.forget();
   }
@@ -76,7 +82,10 @@ export class SessionManager {
   fetch = async (request: Request): Promise<Response> => {
     const isAuthEndpoint = new URL(request.url).pathname.startsWith("/auth/") && !request.url.endsWith("/auth/logout");
     const token = this.accessToken;
-    if (isAuthEndpoint || !token) {
+    if (isAuthEndpoint) {
+      return this.send(this.withCookie(request));
+    }
+    if (!token) {
       return this.send(request);
     }
 
@@ -102,17 +111,23 @@ export class SessionManager {
     return (await this.refresh()) ? this.accessToken : null;
   };
 
-  /** Rotates the refresh token. Concurrent callers share one request. Returns false when signed out. */
+  /**
+   * Rotates the refresh token. Concurrent callers share one request. Returns false when signed out.
+   * Browser tabs share one refresh cookie, so tabs take turns (the API revokes the session if a rotated token is
+   * replayed, which two tabs refreshing at once would do).
+   */
   refresh(): Promise<boolean> {
-    this.refreshInFlight ??= this.doRefresh().finally(() => {
+    const locks = this.credentials.cookie ? globalThis.navigator?.locks : undefined;
+    const run = () => this.doRefresh();
+    this.refreshInFlight ??= (locks ? locks.request("ovrilo-session-refresh", run) : run()).finally(() => {
       this.refreshInFlight = null;
     });
     return this.refreshInFlight;
   }
 
   private async doRefresh(): Promise<boolean> {
-    const refreshToken = await this.credentials.load().catch(() => null);
-    if (!refreshToken) {
+    const refreshToken = this.credentials.cookie ? null : await this.credentials.load().catch(() => null);
+    if (!refreshToken && !this.credentials.cookie) {
       await this.forget();
       return false;
     }
@@ -120,11 +135,13 @@ export class SessionManager {
     let response: Response;
     try {
       response = await this.send(
-        new Request(`${this.baseUrl}/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
-        }),
+        this.withCookie(
+          new Request(`${this.baseUrl}/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken }),
+          }),
+        ),
       );
     } catch {
       // Network failure: keep the stored token so a later attempt can succeed.
@@ -145,6 +162,14 @@ export class SessionManager {
     this.accessToken = null;
     await this.credentials.clear().catch(() => undefined);
     this.setState({ status: "signedOut" });
+  }
+
+  /** Opts an auth request into the API's refresh-cookie transport (browser client only). */
+  private withCookie(request: Request): Request {
+    if (!this.credentials.cookie) return request;
+    const headers = new Headers(request.headers);
+    headers.set("X-Ovrilo-Session", "cookie");
+    return new Request(request, { headers, credentials: "include" });
   }
 
   private authorized(request: Request, token: string): Request {

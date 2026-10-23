@@ -56,10 +56,30 @@ export function useNotificationSettings(): NotificationSettings {
   );
 }
 
-/** Windows notifications exist only in the desktop app. */
-export const desktopNotificationsAvailable = isTauri();
+const browserNotifications = !isTauri() && typeof Notification !== "undefined";
+
+/** Windows notifications in the desktop app; the browser's Notification API in the web client. */
+export const desktopNotificationsAvailable = isTauri() || browserNotifications;
+
+/** Clicking a browser notification opens its conversation (the desktop host emits `notification-activated`). */
+let openFromBrowserNotification: ((conversationId: string) => void) | null = null;
+
+/** The browser asks once; call it from a click so the prompt is allowed. */
+export function requestBrowserNotifications() {
+  if (browserNotifications && Notification.permission === "default") void Notification.requestPermission();
+}
 
 function show(title: string, body: string, conversationId: string | null) {
+  if (browserNotifications) {
+    if (Notification.permission !== "granted") return;
+    const notification = new Notification(title, { body, tag: conversationId ?? undefined });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      if (conversationId) openFromBrowserNotification?.(conversationId);
+    };
+    return;
+  }
   if (!desktopNotificationsAvailable) return;
   void invoke("notify_show", { title, body, conversationId }).catch(() => {
     // Notifications turned off in Windows, or Focus Assist: nothing to do.
@@ -119,13 +139,23 @@ export function useDesktopNotifications(selfId: string, openConversationId: stri
       show(`${ring.caller.displayName} is calling ${where}`, "Open Ovrilo to answer.", ring.conversationId);
     });
 
-    const activated = listen<string | null>("notification-activated", (event) => {
-      if (event.payload) state.current.onOpen(event.payload);
-    });
+    openFromBrowserNotification = (conversationId) => state.current.onOpen(conversationId);
+    // Browsers only show the permission prompt in response to a click.
+    const askOnce = () => {
+      if (settings.enabled) requestBrowserNotifications();
+    };
+    if (browserNotifications) window.addEventListener("pointerdown", askOnce, { once: true });
+    const activated = browserNotifications
+      ? Promise.resolve(() => undefined)
+      : listen<string | null>("notification-activated", (event) => {
+          if (event.payload) state.current.onOpen(event.payload);
+        });
 
     return () => {
       offMessage();
       offCall();
+      openFromBrowserNotification = null;
+      window.removeEventListener("pointerdown", askOnce);
       void activated.then((off) => off());
     };
   }, [realtime, queryClient, selfId]);
