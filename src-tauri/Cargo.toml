@@ -3,6 +3,8 @@ name = "ovrilo"
 version = "0.9.0"
 description = "Ovrilo desktop client"
 authors = ["Ovrilo"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/Ovrilo/ovrilo"
 edition = "2024"
 publish = false
 
