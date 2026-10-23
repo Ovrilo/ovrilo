@@ -39,6 +39,10 @@ export function AboutSettings() {
           Voice and text chat for the people you play with. Downloads and release notes:{" "}
           <span className="selectable">ovrilo.github.io/ovrilo-releases</span>
         </p>
+        <p className="muted small">
+          Ovrilo is free software under the GNU Affero General Public License, version 3. Its source code is at{" "}
+          <span className="selectable">github.com/Ovrilo/ovrilo</span>.
+        </p>
       </section>
       <section className="settings-group" aria-labelledby="about-licenses">
         <h3 id="about-licenses">Third-party software</h3>
