@@ -13,11 +13,12 @@ import { ActivitySettingsPage } from "./ActivitySettings";
 import { DeleteAccount } from "./DeleteAccount";
 import {
   desktopNotificationsAvailable,
+  requestBrowserNotifications,
   setNotificationSettings,
   useNotificationSettings,
 } from "../sounds/desktopNotifications";
 import { playSound, setSoundSettings, SOUND_LABELS, type SoundKind, useSoundSettings } from "../sounds/sounds";
-import { type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
+import { nativeVoice, type NoiseSuppression, useVoice, voice, voiceAvailable, type VoiceDevice } from "../voice/voice";
 
 type Tab = "audio" | "notifications" | "activity" | "account" | "about";
 
@@ -87,7 +88,7 @@ function AudioSettings() {
             devices={snapshot.inputs}
             deviceId={snapshot.inputDeviceId}
             onDevice={(id) => void voice.setInputDevice(id)}
-            volume={snapshot.inputVolume}
+            volume={nativeVoice ? snapshot.inputVolume : null}
             onVolume={(percent) => void voice.setInputVolume(percent)}
             volumeLabel="Input volume"
           />
@@ -127,7 +128,8 @@ function DevicePanel({
   devices: VoiceDevice[];
   deviceId: string | null;
   onDevice: (id: string | null) => void;
-  volume: number;
+  /** Null hides the slider (no microphone volume in the browser). */
+  volume: number | null;
   onVolume: (percent: number) => void;
   volumeLabel: string;
 }) {
@@ -146,7 +148,7 @@ function DevicePanel({
           </option>
         ))}
       </Select>
-      <VolumeSlider label={volumeLabel} value={volume} onCommit={onVolume} />
+      {volume !== null && <VolumeSlider label={volumeLabel} value={volume} onCommit={onVolume} />}
     </div>
   );
 }
@@ -217,7 +219,9 @@ function InputMode() {
           />
           <Keyboard size={18} aria-hidden="true" />
           <strong>Push to talk</strong>
-          <span className="muted small">Hold a key to talk, also while a game has focus.</span>
+          <span className="muted small">
+            {nativeVoice ? "Hold a key to talk, also while a game has focus." : "Hold a key to talk while this tab has focus."}
+          </span>
         </label>
       </div>
       <div className="ptt-key">
@@ -232,8 +236,9 @@ function InputMode() {
         )}
       </div>
       <p className="muted small">
-        The key still reaches your game, and mouse side buttons work too. Games running as administrator may need
-        Ovrilo to run as administrator as well.
+        {nativeVoice
+          ? "The key still reaches your game, and mouse side buttons work too. Games running as administrator may need Ovrilo to run as administrator as well."
+          : "Mouse side buttons work too. To talk while a game has focus, use the desktop app."}
       </p>
     </fieldset>
   );
@@ -259,7 +264,7 @@ function NoiseSuppressionSetting() {
     <fieldset className="settings-group">
       <legend>Noise suppression</legend>
       <div className="segmented" role="radiogroup" aria-label="Noise suppression">
-        {NOISE_OPTIONS.map((option) => (
+        {NOISE_OPTIONS.filter((option) => nativeVoice || option.value !== "enhanced").map((option) => (
           <label key={option.value} className={chosen === option.value ? "selected" : undefined}>
             <input
               type="radio"
@@ -332,14 +337,17 @@ function SoundSettingsPage() {
     <div className="settings-page">
       {desktopNotificationsAvailable && (
         <fieldset className="settings-group">
-          <legend>Windows notifications</legend>
+          <legend>{nativeVoice ? "Windows notifications" : "Browser notifications"}</legend>
           <ul className="sound-list">
             <li className="sound-row">
               <label className="sound-toggle">
                 <input
                   type="checkbox"
                   checked={notifications.enabled}
-                  onChange={(e) => setNotificationSettings({ ...notifications, enabled: e.target.checked })}
+                  onChange={(e) => {
+                    if (e.target.checked) requestBrowserNotifications();
+                    setNotificationSettings({ ...notifications, enabled: e.target.checked });
+                  }}
                 />
                 <span>Show a notification for new direct and group messages and for calls</span>
               </label>

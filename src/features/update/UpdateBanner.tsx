@@ -3,10 +3,10 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { useVoice, voice, voiceAvailable } from "../voice/voice";
+import { nativeVoice, useVoice, voice } from "../voice/voice";
 
 /** Release builds only: dev builds are not published, so there is nothing to update to. */
-const updatesEnabled = voiceAvailable && import.meta.env.PROD;
+const updatesEnabled = nativeVoice && import.meta.env.PROD;
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 type State =

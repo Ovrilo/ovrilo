@@ -850,7 +850,7 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessTokenExpiresAt: string;
-            refreshToken: string;
+            refreshToken: null | string;
             /** Format: date-time */
             sessionExpiresAt: string;
             user: components["schemas"]["CurrentUserResponse"];
@@ -1150,7 +1150,7 @@ export interface components {
             lastReadMessageId: number;
         };
         RefreshRequest: {
-            refreshToken: string;
+            refreshToken: null | string;
         };
         RegisterRequest: {
             username: string;
